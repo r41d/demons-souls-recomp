@@ -52,6 +52,69 @@ Goal: two copies of the game on one PC, where one summons the other.
   a session when it touches a sign. This is what the func_00540D90 call above is for. It is **built but never run**:
   the build that included it lost the edit, and the next run ended in a power cut.
 
+## Step 1 works (2026-11-16, MacBook M2 Pro, two copies on one Mac)
+
+`tools/coop/run_coop_test.sh <work> both 185 <a copy of gamedata>` (the macOS runner; same switches as the
+PowerShell one, `COOP_FRAME_DUMP=1` keeps each copy's last picture): the host sees a blue phantom "Guest1" beside
+it, the guest sees "Host1", each with name plate and health bar, and both stay in the room until the run ends.
+Three things were missing:
+
+- **P2P vports (runtime, libs/network/sysNet.c).** The game binds three SOCK_DGRAM_P2P sockets (vports 6001,
+  6002 and one more) on the one P2P port. The runtime gave each its own UDP socket on that port, so the second
+  bind failed, and the game left its room 20 ms after creating it, once a second (CREATE_ROOM / LEAVE_ROOM pairs
+  in psnr.log, "host key not valid yet" for ever). Now one host UDP socket per copy (the "hub") owns the P2P
+  port; datagrams go out as `dst vport | src vport | payload`, and a thread forwards what arrives to the guest
+  socket bound to that vport (each has a loopback port of its own, so poll / select / nonblocking reads are
+  unchanged). psnr's own probes and punches are taken out first, as before. Both ends must run this build.
+  **Not built or run on Windows**: the thread and socket calls have `_WIN32` branches written blind.
+- **Session creation** (func_00540D90, already on the branch) does return 1 once the sockets bind:
+  `[coop] host create session -> 1`, `host key valid`, `host key written: 169 bytes`.
+- **Where the guest arrives.** The join ran the game's own sequence on the guest (Lua: OnJoinMutiplay,
+  OnBeJoinStart_White, SummonReloadStart, OnBeSummoned_White; then the map's scripts again as a client), but
+  the reload put it at the map's origin, (0, 1.5, 0), outside the level: a real summon arrives at its sign, and
+  this join has none. The host now writes its block and position to `<mailbox>/host_pos.txt` four times a second
+  (coop_host_pos); a guest within 3 m of the origin while a join is under way is put 1 m beside it
+  (des_player_place, in des_coop_step). It fires several times around the reload (15 in one run), until the
+  guest is in the level.
+
+Seen in the logs on the way, harmless so far: before both copies are in the game the guest joins and both leave
+again three or four times (rooms 1-5 in psnr.log); the room made once both are in 1-1 is the one that stays.
+The host's own Lua prints nothing for the join (no SummonSuccess_White).
+
+Not checked: anything past standing next to each other -- movement and attacks as seen by the other side,
+enemies, damage, death, a boss, leaving the area, 60 fps, two machines, a character other than a copy of the
+same save in both copies (both loaded the user's first slot, body form; the guest became a phantom anyway).
+
+## The seamless rules: a script module (2026-11-16, MacBook)
+
+The user's goal: the player who joins is an equal player, not a phantom, and a boss killed together counts in both
+saves. The game's multiplayer rules are all in its event scripts (global_event.lua), so they are changed there, the
+way boss rush changes them: `tools/make_coop.py` builds `game_coop/` (hard links to game/) with
+`tools/coop/coop.lua` appended to global_event.lua in every map's script bundle; the last definition of a Lua global
+wins. Run it with `COOP_GAME=game_coop` in front of the test runner.
+
+- **A. Body form (works).** InGameStart is wrapped: a client that arrives as a white phantom gets
+  `proxy:SetChrType(10000, CHR_TYPE_LivePlayer)`. Both screens then show the guest in body form with a full HP bar
+  (soul-form effect 101 is no longer applied), and the scripts' IsWhiteGhost() branches no longer apply to it.
+- **B. Everybody stays after a boss (works).** BlockClear2_1 is replaced: no rating menu, no LeaveSession, no walk
+  home; a soul-form player is revived as the lone-player version does, and after 3 s everyone takes
+  GetSoloClearBonus and the death / reload locks are released. Tested with
+  `COOP_TEST_KILL=800:50` (make_coop.py --test-kill: the host ForceDeads Phalanx 50 s after the guest is in its
+  party, from the 1-1 start): OnEvent_4096 and BlockClear2 ran on both copies, souls 4102 -> 6384 on the host and
+  -> 5738 on the guest, the host (soul form in this save) came back to body form, no LEAVE_ROOM in psnr.log, and
+  both still saw each other 70 s later. If the kill comes while the guest is still loading in, its picture was
+  black at the end of that run (one run, not looked into).
+- **C. The kill in the guest's own save (designed, not built).** While in the host's world the guest's event flags
+  are the session's; every way home in the scripts calls `proxy:SetFlagInitState(2)`, which rolls them back (13
+  call sites, all Lua). Plan: when the guest first arrives, note which boss kill flags the host's world already
+  had (in spare event flags, which live through reloads inside the session); on the way home, read which kill
+  flags are set now and were not then, roll back as the game does, then set those in the guest's own state.
+  The boss table with each boss's kill flags is in tools/boss_rush/bossrush.lua (BR_B). Open: whether any way
+  home rolls back in native code, whether the demon's soul taken in the session stays in the inventory, what the
+  guest's save holds if the game is closed while still in the session.
+- Not looked at yet: following the host through an area change or a fog gate, the session lock BlockClear2 sets
+  (LockSession: it may refuse a new join after a boss), a guest dying, the host dying, black phantoms.
+
 ## Next steps
 
 1. Host alone: `tools\coop\run_coop_test.ps1 -Work C:\coop_test -Who host -Save <a copy of a gamedata folder>`.

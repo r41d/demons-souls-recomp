@@ -153,6 +153,39 @@ extern "C" void coop_join_result(int rc)
     fprintf(stderr, "[coop] join call returned %d%s\n", rc, rc == 1 ? " (join under way)" : " (will retry)");
 }
 
+/* Where the guest arrives (the step hook, des_coop_step): the host leaves its map block and position in
+ * <mailbox>/host_pos.txt four times a second; the guest reads it while its join is under way. */
+extern "C" void coop_host_pos(int blk, const float* xyz)
+{
+    static unsigned long long next;
+    const unsigned long long t = ps3_qpc_us();
+    if (g_mode != 1 || t < next) return;
+    next = t + 250000ull;
+    const std::string fin = g_dir + COOP_SEP "host_pos.txt", tmp = fin + ".tmp";
+    FILE* f = fopen(tmp.c_str(), "w");
+    if (!f) return;
+    fprintf(f, "%d %.4f %.4f %.4f\n", blk, (double)xyz[0], (double)xyz[1], (double)xyz[2]);
+    fclose(f);
+#ifdef _WIN32
+    MoveFileExA(tmp.c_str(), fin.c_str(), MOVEFILE_REPLACE_EXISTING);
+#else
+    rename(tmp.c_str(), fin.c_str());
+#endif
+}
+
+extern "C" int coop_guest_host_pos(int* blk, float* xyz)
+{
+    static unsigned long long next;
+    const unsigned long long t = ps3_qpc_us();
+    if (g_mode != 2 || g_join_state != 1 || t < next) return 0;
+    next = t + 250000ull;
+    FILE* f = fopen((g_dir + COOP_SEP "host_pos.txt").c_str(), "r");
+    if (!f) return 0;
+    const int n = fscanf(f, "%d %f %f %f", blk, &xyz[0], &xyz[1], &xyz[2]);
+    fclose(f);
+    return n == 4;
+}
+
 /* IsLoggedIn (func_00568400) callers, once each */
 extern "C" void coop_logged_in_from(unsigned lr)
 {

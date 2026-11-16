@@ -273,10 +273,12 @@ diff -ruN a/recompiled/ppu_recomp_009.cpp b/recompiled/ppu_recomp_009.cpp
  } while(0)
  
  /* Each lifted function opens with PPU_MM_SNAP; its loads and stores use that
-@@ -38897,8 +38899,552 @@
+@@ -38895,10 +38897,570 @@
+         ctx->lr = ctx->gpr[0];
+         ctx->gpr[1] = ctx->gpr[1] + (int64_t)(0x90);
          return;
- }
- 
++}
++
 +extern "C" unsigned long long ps3_qpc_us(void);   /* cellGcmSys.c (DES_STEP_STATS) */
 +extern "C" int ps3_host_hotkey(int vk);              /* cellPad.c (god mode toggle) */
 +extern "C" void ps3_host_title_suffix(const char* s);
@@ -350,8 +352,8 @@ diff -ruN a/recompiled/ppu_recomp_009.cpp b/recompiled/ppu_recomp_009.cpp
 +    *ctx = save;
 +    if (chr_out) *chr_out = chr;
 +    return ok;
-+}
-+
+ }
+ 
 +/* Put the player at x, y, z in the current block (PORT DEBUG, NOTES fix 57): lua_LoadChrPos's
 + * func_00273BE0(chr, v2 = (x, y, z, 0)). */
 +static void des_player_place(ppu_context* ctx, uint32_t chr, const float xyz[3])
@@ -386,9 +388,25 @@ diff -ruN a/recompiled/ppu_recomp_009.cpp b/recompiled/ppu_recomp_009.cpp
 +extern "C" void coop_export(const unsigned char* p, unsigned n, unsigned room_hi, unsigned room_lo);
 +extern "C" unsigned coop_import(unsigned char* p, unsigned cap);
 +extern "C" void coop_join_result(int rc);
++extern "C" void coop_host_pos(int blk, const float* xyz);
++extern "C" int coop_guest_host_pos(int* blk, float* xyz);
 +static void des_coop_step(ppu_context* ctx) {
 +    PPU_MM_SNAP
-+    if (!coop_mode() || !coop_poll()) return;
++    if (!coop_mode()) return;
++    /* Where the guest arrives. The summon reload puts a phantom at its sign's position; this join has no sign,
++     * so the guest landed at the map's origin (0, y, 0), outside the level. The host leaves its position in the
++     * mailbox; a guest that finds itself within 3 m of the origin while a join is under way is put next to it. */
++    { uint32_t chr = 0; int blk = -1; float xyz[3];
++      if (des_player_where(ctx, &chr, &blk, xyz)) {
++          if (coop_mode() == 1) coop_host_pos(blk, xyz);
++          else { int hb = -1; float hp[3];
++              if (xyz[0] * xyz[0] + xyz[2] * xyz[2] < 9.0f && coop_guest_host_pos(&hb, hp) &&
++                  hp[0] * hp[0] + hp[2] * hp[2] >= 9.0f) {
++                  hp[0] += 1.0f;
++                  des_player_place(ctx, chr, hp);
++                  fprintf(stderr, "[coop] guest placed at the host: %.2f %.2f %.2f, map %d,%d (was %.2f %.2f %.2f, map %d,%d)\n",
++                          hp[0], hp[1], hp[2], (hb >> 8) & 0xFF, hb & 0xFF, xyz[0], xyz[1], xyz[2], (blk >> 8) & 0xFF, blk & 0xFF); } } } }
++    if (!coop_poll()) return;
 +    const uint32_t t = vm_read32((uint32_t)ctx->gpr[2] - 0x79AC);
 +    const uint32_t p = t ? vm_read32(t - 0x7F98) : 0;
 +    const uint32_t nm = p ? vm_read32(p) : 0;
