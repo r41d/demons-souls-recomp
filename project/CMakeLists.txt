@@ -207,6 +207,7 @@ add_executable(${PROJECT_NAME}
     stubs.cpp
     ds_guest_setjmp.cpp   # fix 101: guest setjmp/longjmp through host setjmp/longjmp
     ds_boss_rush.cpp   # boss rush mode: timer, splits, starting souls (DES_BOSS_RUSH)
+    ds_coop.cpp   # co-op step 1: summon between two copies through a key file (DES_COOP)
     ${PS3RECOMP_SCAFFOLD}
     ${HLE_NID_TABLE}
     ${RECOMP_SOURCES}

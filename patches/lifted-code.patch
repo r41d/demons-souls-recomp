@@ -273,7 +273,7 @@ diff -ruN a/recompiled/ppu_recomp_009.cpp b/recompiled/ppu_recomp_009.cpp
  } while(0)
  
  /* Each lifted function opens with PPU_MM_SNAP; its loads and stores use that
-@@ -38897,8 +38899,445 @@
+@@ -38897,8 +38899,537 @@
          return;
  }
  
@@ -374,9 +374,101 @@ diff -ruN a/recompiled/ppu_recomp_009.cpp b/recompiled/ppu_recomp_009.cpp
 +extern "C" int br_take_souls(void);
 +extern "C" void br_souls_done(int n);
 +volatile int g_des_title_shown;
++/* Co-op step 1 (PORT PATCH, project/ds_coop.cpp, DES_COOP=host|guest): the host's session key goes to the other
++ * copy through a file, and the guest joins with it. Both ends run the game's own code from func_003A1700, the
++ * sign-summon handler: netmgr = *(*(*(TOC-0x79AC) - 0x7F98)); host 0x3A1D70-0x3A1DF8 (key from func_0052C2D8 ->
++ * func_00E00D10, valid by func_00DFE110, written as join type -1 + func_00DFE2F0 into a 0x200-byte writer);
++ * guest 0x3A2510-0x3A2CD8 / 0x3A3320 (a reader over the bytes, the s32 join type, SetJoinType func_002107B8,
++ * func_00DFE9F8 + func_00DFF0D0 rebuild the key, func_0053CFE8(netmgr, key) joins, func_00DFE768 frees the key).
++ * Run with the stack pointer moved 0x1000 below this function's frame and every register restored afterwards. */
++extern "C" int coop_mode(void);
++extern "C" int coop_poll(void);
++extern "C" void coop_export(const unsigned char* p, unsigned n, unsigned room_hi, unsigned room_lo);
++extern "C" unsigned coop_import(unsigned char* p, unsigned cap);
++extern "C" void coop_join_result(int rc);
++static void des_coop_step(ppu_context* ctx) {
++    PPU_MM_SNAP
++    if (!coop_mode() || !coop_poll()) return;
++    const uint32_t t = vm_read32((uint32_t)ctx->gpr[2] - 0x79AC);
++    const uint32_t p = t ? vm_read32(t - 0x7F98) : 0;
++    const uint32_t nm = p ? vm_read32(p) : 0;
++    static uint32_t said_nm = 1;
++    if (nm != said_nm) { fprintf(stderr, "[coop] netmgr 0x%08X\n", nm); said_nm = nm; }
++    if (!nm) return;
++    const uint32_t h8 = vm_read32(nm + 0x8), st = vm_read32(nm + 0x9C), md = vm_read8(nm + 0x98);
++    ppu_context save = *ctx;
++    const uint32_t old_sp = (uint32_t)ctx->gpr[1];
++    const uint32_t sp = (old_sp - 0x1000) & ~0xFu;
++    vm_write64(sp, old_sp);                            /* back chain */
++    ctx->gpr[1] = sp;
++    const uint32_t reader = sp + 0x100, key = sp + 0x1F0, writer = sp + 0x300, buf = sp + 0x600, tmp = sp + 0x70;
++    if (coop_mode() == 1) {
++        ctx->gpr[3] = nm; ctx->lr = 0x0001B8D0;
++        func_0052C2D8(ctx); DRAIN_TRAMPOLINE(ctx);
++        ctx->gpr[4] = (uint32_t)ctx->gpr[3]; ctx->gpr[3] = key; ctx->gpr[2] = save.gpr[2];
++        func_00E00D10(ctx); DRAIN_TRAMPOLINE(ctx);
++        ctx->gpr[3] = key; ctx->gpr[2] = save.gpr[2];
++        func_00DFE110(ctx); DRAIN_TRAMPOLINE(ctx);
++        const int valid = (int)(ctx->gpr[3] & 0xFF);
++        static int said_valid = -1;
++        if (valid != said_valid) {
++            fprintf(stderr, "[coop] host key %s (netmgr +8 0x%08X state %u mode %u)\n",
++                    valid ? "valid" : "not valid yet", h8, st, md);
++            said_valid = valid; }
++        if (valid) {
++            ctx->gpr[3] = writer; ctx->gpr[4] = buf; ctx->gpr[5] = 0x200; ctx->gpr[2] = save.gpr[2];
++            func_00A8BEA8(ctx); DRAIN_TRAMPOLINE(ctx);
++            vm_write32(tmp, 0xFFFFFFFFu);
++            ctx->gpr[3] = writer; ctx->gpr[4] = tmp; ctx->gpr[5] = 4; ctx->gpr[2] = save.gpr[2];
++            func_00A8BCE0(ctx); DRAIN_TRAMPOLINE(ctx);
++            ctx->gpr[3] = key; ctx->gpr[4] = writer; ctx->gpr[2] = save.gpr[2];
++            func_00DFE2F0(ctx); DRAIN_TRAMPOLINE(ctx);
++            ctx->gpr[3] = writer; ctx->gpr[2] = save.gpr[2];
++            func_00A8B9D0(ctx); DRAIN_TRAMPOLINE(ctx);
++            const uint32_t n = (uint32_t)ctx->gpr[3];
++            if (n > 0 && n <= 0x200) {
++                unsigned char b[0x200];
++                for (uint32_t i = 0; i < n; i++) b[i] = (unsigned char)vm_read8(buf + i);
++                coop_export(b, n, vm_read32(key + 8), vm_read32(key + 12));
++            } else fprintf(stderr, "[coop] host key length %u?\n", n);
++        }
++    } else {
++        unsigned char b[0x200];
++        const unsigned n = coop_import(b, sizeof b);
++        fprintf(stderr, "[coop] guest join: key %u bytes, netmgr +8 0x%08X state %u mode %u\n", n, h8, st, md);
++        if (n >= 4) {
++            for (unsigned i = 0; i < n; i++) vm_write8(buf + i, b[i]);
++            ctx->gpr[3] = reader; ctx->gpr[4] = buf; ctx->gpr[5] = n; ctx->lr = 0x0001B8D0;
++            func_00A8B770(ctx); DRAIN_TRAMPOLINE(ctx);
++            vm_write32(tmp, 0xFFFFFFFFu);
++            ctx->gpr[3] = reader; ctx->gpr[4] = tmp; ctx->gpr[5] = 4; ctx->gpr[2] = save.gpr[2];
++            func_00A8B580(ctx); DRAIN_TRAMPOLINE(ctx);
++            const int32_t jt = (int32_t)vm_read32(tmp);
++            ctx->gpr[3] = (uint64_t)(int64_t)jt; ctx->gpr[2] = save.gpr[2];
++            func_002107B8(ctx); DRAIN_TRAMPOLINE(ctx);
++            ctx->gpr[3] = key; ctx->gpr[2] = save.gpr[2];
++            func_00DFE9F8(ctx); DRAIN_TRAMPOLINE(ctx);
++            ctx->gpr[3] = key; ctx->gpr[4] = reader; ctx->gpr[2] = save.gpr[2];
++            func_00DFF0D0(ctx); DRAIN_TRAMPOLINE(ctx);
++            const int ok = (int)(ctx->gpr[3] & 0xFF);
++            int rc = -1;
++            if (ok) {
++                ctx->gpr[3] = nm; ctx->gpr[4] = key; ctx->gpr[2] = save.gpr[2];
++                func_0053CFE8(ctx); DRAIN_TRAMPOLINE(ctx);
++                rc = (int)(ctx->gpr[3] & 0xFF);
++            } else fprintf(stderr, "[coop] guest: the key did not read back (join type %d)\n", jt);
++            ctx->gpr[3] = key; ctx->gpr[2] = save.gpr[2];
++            func_00DFE768(ctx); DRAIN_TRAMPOLINE(ctx);
++            fprintf(stderr, "[coop] guest: join type %d, room %08X%08X\n", jt, vm_read32(key + 8), vm_read32(key + 12));
++            coop_join_result(rc);
++        }
++    }
++    *ctx = save;
++}
  void func_0001B8D0(ppu_context* ctx) {
      PPU_MM_SNAP
 +    br_step();
++    des_coop_step(ctx);
 +    /* Boss rush starting souls (project/ds_boss_rush.cpp): added to the player's game data, souls at +0x78.
 +     * That struct = *(*(*(TOC[-0x788C] - 0x8000)) + 8), as func_00414F88 -> func_00224B10 (soul level). */
 +    { const int add = br_take_souls();
@@ -1107,6 +1199,41 @@ diff -ruN a/recompiled/ppu_recomp_019.cpp b/recompiled/ppu_recomp_019.cpp
  } while(0)
  
  /* Each lifted function opens with PPU_MM_SNAP; its loads and stores use that
+@@ -1930,6 +1932,7 @@
+         goto loc_00199E94;
+ }
+ 
++extern "C" int coop_mode(void);   /* project/ds_coop.cpp */
+ void func_00199EF8(ppu_context* ctx) {
+     PPU_MM_SNAP
+         uint64_t _cs_29 = ctx->gpr[29];
+@@ -1954,6 +1957,26 @@
+         ctx->gpr[9] = ctx->gpr[11] + (int64_t)(8);
+ loc_00199F3C:
+         ctx->gpr[3] = ppc_rldicl(ctx->gpr[9], 0, 32);
++        /* Co-op (PORT PATCH, project/ds_coop.cpp): with DES_COOP set there is no login server -- skip StartLogin
++         * (func_005687C0) and the "Logging into the server" box (0xC3B5) and go to state 0x14, where the game
++         * takes the login as done (func_00197A88: online mode on, then state 0x15). */
++        if (coop_mode()) {
++            fprintf(stderr, "[coop] login skipped: state 6 -> 0x14\n");
++            ctx->gpr[3] = (int64_t)(int32_t)(0x11);
++            ctx->gpr[4] = (int64_t)(int32_t)(0);
++            ctx->lr = 0x00199F54; func_00720F50(ctx); DRAIN_TRAMPOLINE(ctx);
++            ctx->gpr[3] = (int64_t)(int32_t)(-1);
++            ctx->gpr[4] = (int64_t)(int32_t)(-1);
++            ctx->lr = 0x00199F64; func_007216D0(ctx); DRAIN_TRAMPOLINE(ctx);
++            ctx->gpr[0] = (int64_t)(int32_t)(0x14);
++            vm_write32(ctx->gpr[29] + 0x8, ctx->gpr[0]);
++            ctx->gpr[0] = vm_read64(ctx->gpr[1] + 0xA0);
++            ctx->gpr[29] = _cs_29;
++            ctx->gpr[31] = _cs_31;
++            ctx->lr = ctx->gpr[0];
++            ctx->gpr[1] = ctx->gpr[1] + (int64_t)(0x90);
++            return;
++        }
+         ctx->lr = 0x00199F44; func_005687C0(ctx); DRAIN_TRAMPOLINE(ctx);
+         /* nop */;
+         ctx->gpr[3] = (int64_t)(int32_t)(0x11);
 diff -ruN a/recompiled/ppu_recomp_020.cpp b/recompiled/ppu_recomp_020.cpp
 --- a/recompiled/ppu_recomp_020.cpp	2026-10-31 08:09:10.797354000 -0700
 +++ b/recompiled/ppu_recomp_020.cpp	2026-10-31 08:09:16.464832500 -0700
@@ -1534,6 +1661,20 @@ diff -ruN a/recompiled/ppu_recomp_037.cpp b/recompiled/ppu_recomp_037.cpp
  } while(0)
  
  /* Each lifted function opens with PPU_MM_SNAP; its loads and stores use that
+@@ -45012,8 +45014,13 @@
+         { g_trampoline_fn = (void(*)(void*))func_00568400; return; }
+ }
+ 
++extern "C" int coop_mode(void);                 /* project/ds_coop.cpp */
++extern "C" void coop_logged_in_from(unsigned lr);
+ void func_00568400(ppu_context* ctx) {
+     PPU_MM_SNAP
++    /* Co-op (PORT PATCH): with DES_COOP set the player counts as logged in (there is no server; the request
++     * queue's own gate, I+0x19C, stays shut so nothing is sent). Callers logged once each. */
++    if (coop_mode()) { coop_logged_in_from((unsigned)ctx->lr); ctx->gpr[3] = 1; return; }
+         ctx->gpr[0] = vm_read8(ctx->gpr[3] + 0xA);
+         ctx->gpr[9] = (int64_t)(int32_t)(0);
+         { int64_t a = (int32_t)ctx->gpr[0]; int64_t b = (int64_t)0; uint32_t cr_val = ((a < b) ? 8 : (a > b) ? 4 : 2) | ((ctx->xer >> 31) & 1u); ctx->cr = (ctx->cr & ~(0xFu << 0)) | (cr_val << 0); }
 diff -ruN a/recompiled/ppu_recomp_038.cpp b/recompiled/ppu_recomp_038.cpp
 --- a/recompiled/ppu_recomp_038.cpp	2026-10-31 08:09:11.475296300 -0700
 +++ b/recompiled/ppu_recomp_038.cpp	2026-10-31 08:09:17.315358000 -0700
