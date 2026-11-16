@@ -3835,7 +3835,7 @@ Don't run ps3recomp tools with `-P`/`-I`: they import sibling modules from their
       folder): with timer_font.bin the game-font timer "0:00.0 / Souls x2" at the bottom centre; without it the
       text overlay at the top. make_boss_rush.py ran on Linux (2.4 s) and wrote bossrush/timer_font.bin.
 
-207. **Native Linux / macOS: Storm King beach missing rocks -- fix 64 again, in the draw engine (2026-11-16, user report
+209. **Native Linux / macOS: Storm King beach missing rocks -- fix 64 again, in the draw engine (2026-11-16, user report
     after a full boss rush: "missing level geometry in the storm king fight")**
     - rsx_draw_engine.c (Vulkan and Metal) queued a draw's DRAW_ARRAYS / DRAW_INDEX_ARRAY packets in
       dc.arr / dc.idx[ENG_MAX_BATCHES = 256] and dropped the rest silently: every draw over 65,536 vertices or
