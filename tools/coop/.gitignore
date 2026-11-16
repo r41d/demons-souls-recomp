@@ -1,0 +1,7 @@
+# lifted_patch_tool.py working files: pristine/edited copies of lifted GAME code -- never commit these
+pristine/
+edited_lf_*
+verify_*
+sec.patch
+*.bak
+psnr_selftest_server.log

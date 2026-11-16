@@ -273,7 +273,7 @@ diff -ruN a/recompiled/ppu_recomp_009.cpp b/recompiled/ppu_recomp_009.cpp
  } while(0)
  
  /* Each lifted function opens with PPU_MM_SNAP; its loads and stores use that
-@@ -38897,8 +38899,537 @@
+@@ -38897,8 +38899,552 @@
          return;
  }
  
@@ -403,6 +403,21 @@ diff -ruN a/recompiled/ppu_recomp_009.cpp b/recompiled/ppu_recomp_009.cpp
 +    ctx->gpr[1] = sp;
 +    const uint32_t reader = sp + 0x100, key = sp + 0x1F0, writer = sp + 0x300, buf = sp + 0x600, tmp = sp + 0x70;
 +    if (coop_mode() == 1) {
++        /* No session yet: create one the way the sign-touch handler does (func_003A1160 -> func_00540D90(netmgr,
++         * f1 = *(TOC table - 0x7F90)) at 0x3A1218); it returns 1 once the host's session is up. */
++        if (!h8) {
++            const uint32_t tt = vm_read32((uint32_t)save.gpr[2] - 0x79AC);
++            const uint32_t fw = tt ? vm_read32(tt - 0x7F90) : 0; float f; memcpy(&f, &fw, 4);
++            ctx->gpr[3] = nm; ctx->fpr[1] = f; ctx->lr = 0x0001B8D0;
++            func_00540D90(ctx); DRAIN_TRAMPOLINE(ctx);
++            static int said_rc = -2;
++            const int rc = (int)(ctx->gpr[3] & 0xFF);
++            if (rc != said_rc) {
++                fprintf(stderr, "[coop] host create session -> %d (netmgr +8 0x%08X state %u, f1 %.3f)\n", rc,
++                        vm_read32(nm + 0x8), vm_read32(nm + 0x9C), (double)f);
++                said_rc = rc; }
++            ctx->gpr[1] = sp; ctx->gpr[2] = save.gpr[2];
++        }
 +        ctx->gpr[3] = nm; ctx->lr = 0x0001B8D0;
 +        func_0052C2D8(ctx); DRAIN_TRAMPOLINE(ctx);
 +        ctx->gpr[4] = (uint32_t)ctx->gpr[3]; ctx->gpr[3] = key; ctx->gpr[2] = save.gpr[2];
