@@ -2,7 +2,7 @@
 
 The game built as an arm64-v8a Android shared library (`libmain.so`) and run by SDL2's `SDLActivity`,
 drawn by the same Vulkan backend as the native Linux build ([LINUX_NATIVE.md](LINUX_NATIVE.md)). Built
-on a Linux PC with the NDK; the APK is made from your own disc and stays on your machines, debug-signed.
+on a Linux PC or a Mac with the NDK; the APK is made from your own disc and stays on your machines, debug-signed.
 **Never publish the APK**: it contains the game's lifted code.
 
 **Status (2026-11-16):** builds and packs (M0); runs in game on a Pixel 10 Pro XL at 30 fps (M1/M2 and past).
@@ -39,9 +39,10 @@ driver "PowerVR D-Series Vulkan Driver" 25.3@6908880 (conformance 1.4.5.0).
 
 ## Build
 
-Needs: a checkout that went through `linux/native/build.sh venv game decrypt toolkit lift`, the Android
-SDK in `~/Android/sdk` (cmdline-tools, `ndk;28.2.13676358`, `platform-tools`, `build-tools;35.0.0`,
-`platforms;android-35`), a JDK 17, and:
+Needs: a checkout that went through `linux/native/build.sh venv game decrypt toolkit lift` (on macOS:
+`mac/rebuild.sh venv game decrypt toolkit lift`), the Android SDK in `~/Android/sdk` (macOS:
+`~/Library/Android/sdk`; `ANDROID_HOME` names another place) with cmdline-tools, `ndk;28.2.13676358`,
+`platform-tools`, `build-tools;35.0.0` and `platforms;android-35`, a JDK 17, and:
 
 ```sh
 android/build_deps.sh          # SDL2 2.30.12 + glslang 15.4.0 for arm64 -> ~/Android/prefix-arm64
@@ -49,6 +50,35 @@ android/build_so.sh            # the game -> port/build_android/libmain.so
 android/build_apk.sh install   # the APK (debug-signed), adb install on the connected phone
 android/push_game.sh           # game/ -> /sdcard/Android/data/io.github.timboat.desrecomp/files/game
 ```
+
+`android/env.sh` holds what differs between systems (the SDK's place, the NDK's host tools, the JDK on
+macOS) and is read by all four scripts; its header lists the settings.
+
+### On macOS (Apple silicon)
+
+Built on a MacBook (M2 Pro, 16 GB) on 2026-11-17: the APK comes out (322 MB, 16 KB aligned), **but it has
+not been installed or run on a device** -- only the Linux-built APK has. With Homebrew, cmake and ninja
+(`mac/rebuild.sh deps` checks them):
+
+```sh
+brew install openjdk@17                        # the JDK (no password; env.sh finds it)
+brew install --cask android-commandlinetools   # Google's sdkmanager
+export JAVA_HOME=/opt/homebrew/opt/openjdk@17  # for sdkmanager, in this shell
+yes | sdkmanager --sdk_root=$HOME/Library/Android/sdk --licenses    # accepts Google's SDK licences
+sdkmanager --sdk_root=$HOME/Library/Android/sdk "ndk;28.2.13676358" platform-tools \
+           "build-tools;35.0.0" "platforms;android-35"              # ~1.2 GB down, 3.1 GB on disk
+mac/rebuild.sh venv game decrypt toolkit lift  # skip what the Mac build already did
+android/build_deps.sh          # -> ~/Library/Android/prefix-arm64 (sources in ~/Library/Android/src)
+android/build_so.sh            # 68 min here with ninja's default jobs; try JOBS=6 (NOTES fix 304)
+android/build_apk.sh           # "install" with a phone connected, as on Linux
+```
+
+Gradle fetches itself (8.9), the Android Gradle plugin and `build-tools;34.0.0` on the first run
+(~630 MB in `~/.gradle`). The compile is far slower than on the Linux PC below, likely for lack of memory
+(16 GB, 12 jobs); that is a guess, not a measurement.
+
+On Windows the scripts are meant to run under Git Bash (the SDK in `%LOCALAPPDATA%\Android\Sdk`); that
+path has never been run, and there is no `gradlew.bat` in the repository yet.
 
 M0, measured on a Ryzen 7 5800X (16 threads, 32 GB), NDK r28c, `CMAKE_BUILD_TYPE=Fast`, no LTO:
 

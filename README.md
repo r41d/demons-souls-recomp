@@ -130,10 +130,11 @@ settings and what is still missing: [docs/MACOS.md](docs/MACOS.md).
 It boots into the game and plays: on a Pixel 10 Pro XL (Android 17) it loads a save and holds 30 fps in game,
 with a Bluetooth controller or the on-screen touch controls. The handheld it is meant for, the **AYN Thor**,
 is untested because I don't own one yet, and other phones are untested too. No release: you build the APK
-yourself, on a Linux PC, from your own disc. **Never share the APK**: it contains the game's code.
+yourself, on a Linux PC or a Mac, from your own disc. **Never share the APK**: it contains the game's code.
 
-1. Run the native Linux steps first (`linux/native/build.sh venv game decrypt toolkit lift`): they make the
-   game files and the recompiled code from your disc image.
+1. Run the native Linux steps first (`linux/native/build.sh venv game decrypt toolkit lift`; on a Mac
+   `mac/rebuild.sh venv game decrypt toolkit lift`): they make the game files and the recompiled code from
+   your disc image.
 2. Install the Android SDK with NDK r28 and a JDK 17, then run `android/build_deps.sh` (SDL2 + glslang for
    arm64), `android/build_so.sh` (the game, ~10 minutes on an 8-core PC) and `android/build_apk.sh install`
    (with the phone connected over USB, USB debugging on).

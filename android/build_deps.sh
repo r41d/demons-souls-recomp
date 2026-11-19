@@ -1,17 +1,16 @@
 #!/bin/bash
 # Builds SDL2 2.30.12 and glslang 15.4.0 for arm64-v8a (Android API 29) into one prefix, for
 # android/build_so.sh. glslang without SPIRV-Tools (ENABLE_OPT=OFF): the Vulkan backend's shaders do not
-# need its optimizer (rsx_shader_spirv.cpp). Sources are downloaded once into ~/Android/src.
+# need its optimizer (rsx_shader_spirv.cpp). Sources are downloaded once into ~/Android/src
+# (macOS: ~/Library/Android/src). Runs on Linux, macOS and Windows (Git Bash): android/env.sh.
 #
 #   android/build_deps.sh
 #
-# Environment: ANDROID_NDK (default: the newest NDK under $ANDROID_HOME/ndk), DES_ANDROID_PREFIX (default
-# ~/Android/prefix-arm64).
+# Environment: android/env.sh (ANDROID_HOME, ANDROID_NDK, DES_ANDROID_PREFIX, DES_ANDROID_SRC).
 set -eo pipefail
-SDK=${ANDROID_HOME:-$HOME/Android/sdk}
-NDK=${ANDROID_NDK:-$(ls -d "$SDK"/ndk/* 2>/dev/null | sort -V | tail -n 1)}
-PREFIX=${DES_ANDROID_PREFIX:-$HOME/Android/prefix-arm64}
-SRC=${DES_ANDROID_SRC:-$HOME/Android/src}
+here=$(cd "$(dirname "$0")" && pwd)
+. "$here/env.sh"
+SRC=$SRC_DIR
 SDL_V=2.30.12
 GLSLANG_V=15.4.0
 [ -f "$NDK/build/cmake/android.toolchain.cmake" ] || { echo "ERROR: no NDK at '$NDK' (ANDROID_NDK)" >&2; exit 1; }

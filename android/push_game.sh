@@ -11,12 +11,13 @@
 set -eo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 DES_ROOT=$(cd "$here/.." && pwd)
-ADB=${ADB:-${ANDROID_HOME:-$HOME/Android/sdk}/platform-tools/adb}
+. "$here/env.sh"
+ADB=${ADB:-$ANDROID_HOME/platform-tools/adb$DES_EXE}
 PKG=io.github.timboat.desrecomp
 DST=/sdcard/Android/data/$PKG/files
 SRC=$(cd "${1:-$DES_ROOT/game}" && pwd)
 fail() { echo "ERROR: $*" >&2; exit 1; }
-[ -f "$SRC/PS3_GAME/USRDIR/EBOOT.elf" ] || fail "no $SRC/PS3_GAME/USRDIR/EBOOT.elf (linux/native/build.sh game decrypt)"
+[ -f "$SRC/PS3_GAME/USRDIR/EBOOT.elf" ] || fail "no $SRC/PS3_GAME/USRDIR/EBOOT.elf (the game and decrypt steps: $DES_LIFT_HINT)"
 "$ADB" get-state >/dev/null 2>&1 || fail "no device (adb devices; accept the USB debugging prompt on the phone)"
 "$ADB" shell mkdir -p "$DST/game"
 

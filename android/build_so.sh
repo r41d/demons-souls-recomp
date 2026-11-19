@@ -1,27 +1,25 @@
 #!/bin/bash
 # Cross-builds the game as an arm64-v8a Android shared library (libmain.so) with the NDK: the same cmake
 # line as linux/native/build.sh's build step, plus the NDK toolchain. Needs the game lifted first
-# (linux/native/build.sh venv game decrypt toolkit lift) and SDL2 + glslang built for arm64-v8a into
-# one prefix (android/build_deps.sh).
+# (linux/native/build.sh venv game decrypt toolkit lift; on macOS mac/rebuild.sh with the same steps) and
+# SDL2 + glslang built for arm64-v8a into one prefix (android/build_deps.sh). Runs on Linux, macOS and
+# Windows (Git Bash): android/env.sh.
 #
 #   android/build_so.sh            configure + build -> port/build_android/libmain.so
 #
 # Environment:
-#   ANDROID_NDK   the NDK (default: the newest under $ANDROID_HOME/ndk, else ~/Android/sdk/ndk)
-#   DES_ANDROID_PREFIX   the SDL2 + glslang prefix (default ~/Android/prefix-arm64)
+#   ANDROID_HOME, ANDROID_NDK, DES_ANDROID_PREFIX   the SDK, the NDK, the SDL2 + glslang prefix: android/env.sh
 #   DES_BUILD     the build folder (default port/build_android)
 #   JOBS          parallel compile jobs (ninja's -j)
 set -eo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 DES_ROOT=$(cd "$here/.." && pwd)
-SDK=${ANDROID_HOME:-$HOME/Android/sdk}
-NDK=${ANDROID_NDK:-$(ls -d "$SDK"/ndk/* 2>/dev/null | sort -V | tail -n 1)}
-PREFIX=${DES_ANDROID_PREFIX:-$HOME/Android/prefix-arm64}
+. "$here/env.sh"
 DES_BUILD=${DES_BUILD:-$DES_ROOT/port/build_android}
 fail() { echo "ERROR: $*" >&2; exit 1; }
 [ -f "$NDK/build/cmake/android.toolchain.cmake" ] || fail "no NDK at '$NDK' (ANDROID_NDK)"
 [ -f "$PREFIX/lib/libSDL2.so" ] || fail "no SDL2 for arm64 in $PREFIX: run android/build_deps.sh"
-[ -f "$DES_ROOT/port/.lifted" ] || fail "nothing lifted yet: linux/native/build.sh venv game decrypt toolkit lift"
+[ -f "$DES_ROOT/port/.lifted" ] || fail "nothing lifted yet: $DES_LIFT_HINT"
 
 # No -march, no AVX2, no LTO. -ffp-contract=off: arm64 would fuse a multiply and an add the game does
 # separately (the lifted PPU code has it already; this covers the SPU code and the runtime too).

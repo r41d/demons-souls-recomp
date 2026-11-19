@@ -3793,6 +3793,33 @@ Don't run ps3recomp tools with `-P`/`-I`: they import sibling modules from their
        refresh the windowed layer does not get. Not checked: a 60 Hz external screen, moving the window to
        another screen mid-game, by eye (all of this is from presented times), fights and menus.
 
+304. **Android: the APK builds on macOS too (2026-11-17, MacBook M2 Pro, macOS; scripts shared with Linux):**
+     - The four android/*.sh scripts assumed a Linux PC: the SDK in ~/Android/sdk, the NDK's host tools under
+       toolchains/llvm/prebuilt/linux-x86_64 (build_apk.sh's llvm-strip: "no llvm-strip in the NDK" on a Mac,
+       where the folder is darwin-x86_64, a universal binary despite the name), `sort -V`, and messages that
+       name linux/native/build.sh. macOS's /usr/bin/java is a stub, so gradlew found no Java either.
+     - Fix: android/env.sh, sourced by all four (NOT Mac-only files: the Linux build runs through it too). It
+       picks by `uname -s`: the SDK default (~/Android/sdk, ~/Library/Android/sdk on macOS,
+       %LOCALAPPDATA%\Android\Sdk under Git Bash / MSYS2), the NDK host folder and an .exe suffix, the
+       prefix and source folders beside the SDK folder (Linux: ~/Android/prefix-arm64 and ~/Android/src, as
+       before), JAVA_HOME on macOS when unset (Homebrew's openjdk@17, else /usr/libexec/java_home -v 17),
+       and the lift command to name in messages. The newest NDK / build-tools are picked by a numeric sort
+       on the folder names instead of `sort -V`. Every value can still be set from the environment.
+     - No change was needed in the C/C++ sources, CMake, Gradle or the patches: Homebrew's cmake 4.4.5 and
+       ninja 1.13.2 configure SDL2 2.30.12, glslang 15.4.0 and the game with the NDK toolchain as they are.
+     - Built here from origin/main da498ec in a separate worktree, lifted with mac/rebuild.sh toolkit lift:
+       libmain.so 2.0 GB with debug info, 330,474,144 bytes stripped (aarch64, exports SDL_main and the touch
+       pad's JNI function, LOAD segments 16 KB aligned); app-debug.apk 322 MB, both libraries stored
+       uncompressed, `zipalign -c -P 16` passes, minSdk 29 / compileSdk 35.
+     - Slow here: the compile took 68 min wall (42,671 s of compiler time over 326 steps; the four largest
+       lifted files 23-28 min each) against 10 min 41 s / 8,294 s on the Ryzen 7 5800X. The Mac has 16 GB
+       and ninja ran 12 jobs of up to 2 GB each; memory pressure is the suspect, NOT measured. Try JOBS=6.
+       The APK step took 43 s (first run, with Gradle's downloads).
+     - NOT tested: the APK was not installed or run anywhere (no phone connected, no emulator), so nothing
+       says a Mac-built APK behaves as the Linux-built one. The Linux and Windows paths of env.sh were not
+       run: Linux keeps its old defaults by reading; Windows (Git Bash) is written blind, and gradlew.bat is
+       not in the repository.
+
 150. **Branch dispq-batch, opt-in: the SPU dispatcher takes the rest of a fetched queue line without re-reserving
      (DES_DISPQ_BATCH=1); 1-1 walk 24.7 -> 29.2 real pictures a second with frame skip off (2026-11-12, GTX 1070
      Max-Q laptop, i7-8750H):**
