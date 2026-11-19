@@ -47,7 +47,7 @@ def disc_key(image, given, check):
              f'your dump) against Redump\'s page for the disc: {setup.REDUMP_PAGE}', 4)
     fail('this image is encrypted (as Redump images are) and needs its disc key: the 32 hex digits that came '
          'with your dump (a .dkey file next to the .iso), or the "Disc Key" on Redump\'s page for the disc: '
-         f'{setup.REDUMP_PAGE} (Demon\'s Souls USA, BLUS-30443). Give it and run the install again.', 3)
+         f'{setup.REDUMP_PAGE} (Demon\'s Souls {setup.R["name"]}, {setup.R["serial"]}). Give it and run the install again.', 3)
 
 
 def step_game(src, key):
@@ -57,15 +57,18 @@ def step_game(src, key):
         print('  already extracted', flush=True)
         return
     if not src:
-        fail('no disc image given (DES_ISO): choose your Demon\'s Souls (USA, BLUS-30443) image')
+        fail('no disc image given (DES_ISO): choose your Demon\'s Souls image (USA BLUS-30443 or Europe BLES-00932)')
     src = os.path.abspath(src)
     if not os.path.exists(src):
         fail(f'{src}: not there')
     os.makedirs(setup.GAME, exist_ok=True)
     if os.path.isdir(src):
+        sfo = os.path.join(src, 'PS3_GAME', 'PARAM.SFO')
+        setup.use_release(setup.region.sfo_title_id(open(sfo, 'rb').read()) if os.path.isfile(sfo) else None)
         setup.copy_folder_dump(src)
     else:
         try:
+            setup.use_release(iso_extract.title_id(src))
             needs_key, check = iso_extract.probe(src)
         except SystemExit as e:   # iso_extract exits with a message for a non-PS3 image
             fail(str(e))
@@ -79,7 +82,7 @@ def step_game(src, key):
         if r.returncode:
             fail('tools/udf_rename.py failed')
     if not os.path.isfile(usr):
-        fail('no PS3_GAME/USRDIR/EBOOT.BIN after extraction: is this Demon\'s Souls (BLUS-30443)?')
+        fail('no PS3_GAME/USRDIR/EBOOT.BIN after extraction: is this Demon\'s Souls (BLUS-30443 / BLES-00932)?')
     with open(mark, 'w') as f:
         f.write(src + '\n')
     print(f'  game files in {setup.GAME}', flush=True)
@@ -98,8 +101,8 @@ def step_check_elf(any_ok):
         return
     bin_ = os.path.join(setup.USRDIR, 'EBOOT.BIN')
     other = os.path.isfile(bin_) and setup.sha256(bin_) != setup.EBOOT_BIN_SHA256
-    msg = (f'EBOOT.elf is not the tested one (sha256 {h}). This port is made for Demon\'s Souls USA BLUS-30443 '
-           'version 1.00 as on the disc' + ('; your EBOOT.BIN is a different one too (another region or an update)'
+    msg = (f'EBOOT.elf is not the tested one (sha256 {h}). This port is made for Demon\'s Souls '
+           f'{setup.R["name"]} {setup.R["serial"]} version 1.00 as on the disc' + ('; your EBOOT.BIN is a different one too (another region or an update)'
                                             if other else '') + '. The patches will most likely not apply.')
     if any_ok:
         print('WARNING: ' + msg, flush=True)

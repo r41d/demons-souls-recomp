@@ -9,7 +9,7 @@ update of this repo, steps 3 and 5 re-apply the patches that changed (setup/patc
      from RPCS3's public source (RPCS3 itself if that fails)
   3. fetch ps3recomp at the tested commit + our patches   -> deps/ps3recomp
   4. recompile the game's PPU and SPU code to C/C++       -> port/recompiled, port/spu
-  5. apply this port's edits to the recompiled code       (patches/lifted-code.patch)
+  5. apply this port's edits to the recompiled code       (patches/lifted-code.patch; Europe: lifted-code-eu.patch)
   6. build DemonsSoulsRecomp.exe                          -> port/build_opt (setup/build.py)
 
 usage: SETUP.bat [image.iso | image.zip | dumped disc folder] [--key HEX | --key file.dkey]
@@ -25,6 +25,7 @@ sys.path.insert(0, os.path.join(ROOT, 'tools'))
 sys.path.insert(0, os.path.join(ROOT, 'setup'))
 import build                                                    # noqa: E402
 import patch_sync                                               # noqa: E402
+import region                                                   # noqa: E402
 
 GAME = os.path.join(ROOT, 'game')
 USRDIR = os.path.join(GAME, 'PS3_GAME', 'USRDIR')
@@ -34,17 +35,9 @@ CONFIG = os.path.join(ROOT, 'setup', 'local_config.json')       # remembered pat
 
 PS3RECOMP_URL = 'https://github.com/sp00nznet/ps3recomp.git'
 PS3RECOMP_COMMIT = '4e8f3ca87a3e1d87bb83b8b7e9348fe2685cd514'   # v0.18.0, what the patches are made against
-EBOOT_BIN_SHA256 = '77375fbf5c654b5a92b870831862a9a09bdc9e6052956d5b84503bda5704f3ac'
-EBOOT_ELF_SHA256 = '90eaa5e9e48b4874292badc311ccea253e6a622ff188bfbdbe76e6f6821269d8'
-# SPURS job binaries the game hands to SPU at run time; they sit inside the EBOOT (file offsets)
-SPURS_JOBS = [(0x176B480, 384, 'B1463A6F2DF960AC'), (0x176B600, 2064, 'BD46853E5ADE5098')]
-LIFT_ARGS = ['--code-end', '0x16bb5e4', '--chunks', '128']
 # What to tell you to run: the Linux launchers (linux/setup.sh, the AppImage) set these
 SETUP_NAME = os.environ.get('DS_SETUP_NAME') or 'SETUP.bat'
 PLAY_HINT = os.environ.get('DS_PLAY_HINT') or 'Double-click DemonsSoulsLauncher.exe to play.'
-# Redump's page for the disc: its "Disc Key" line is the key an encrypted Redump image needs. Opened for the player
-# when there is no .dkey; the key itself is never part of this kit.
-REDUMP_PAGE = 'http://redump.org/disc/16199/'
 RPCS3_LINUX_RELEASES = 'https://api.github.com/repos/RPCS3/rpcs3-binaries-linux/releases/latest'
 RPCS3_WIN_RELEASES = 'https://api.github.com/repos/RPCS3/rpcs3-binaries-win/releases/latest'
 # 7-Zip's own standalone 7zr.exe: unpacks RPCS3's .7z where Windows' tar.exe cannot (Windows 10 and Windows
@@ -53,6 +46,25 @@ SEVENZR_URL = 'https://github.com/ip7z/7zip/releases/download/26.05/7zr.exe'
 SEVENZR_SHA256 = '9bf582b894dfa665f852d7e9112b02290a1c303c2d95a21fcdc41ffcb03143b7'
 VCRT_MIN = (14, 40)   # RPCS3's Windows builds are made with Visual C++ 14.5x; its runtime must not be older
 VCREDIST_URL = 'https://aka.ms/vs/17/release/vc_redist.x64.exe'   # Microsoft's own link to the newest x64 runtime
+
+# The release (USA BLUS-30443 or Europe BLES-00932, setup/region.py) decides the EBOOT hashes, the lift settings,
+# the SPURS job offsets, Redump's page for the disc (its "Disc Key" line is the key an encrypted Redump image
+# needs; opened for the player when there is no .dkey, the key itself is never part of this kit) and which
+# patch carries the port's edits to the recompiled code. Read from the game's PARAM.SFO; the US one until
+# there is a game folder.
+REGION = R = EBOOT_BIN_SHA256 = EBOOT_ELF_SHA256 = SPURS_JOBS = LIFT_ARGS = REDUMP_PAGE = LIFTED_PATCH = None
+
+
+def set_region(key):
+    global REGION, R, EBOOT_BIN_SHA256, EBOOT_ELF_SHA256, SPURS_JOBS, LIFT_ARGS, REDUMP_PAGE, LIFTED_PATCH
+    REGION, R = key, region.REGIONS[key]
+    EBOOT_BIN_SHA256, EBOOT_ELF_SHA256 = R['eboot_bin_sha256'], R['eboot_elf_sha256']
+    SPURS_JOBS, LIFT_ARGS, REDUMP_PAGE = R['spurs_jobs'], R['lift_args'], R['redump_page']
+    LIFTED_PATCH = R['lifted_patch']
+    patch_sync.LIFTED_PATCH = os.path.join(ROOT, 'patches', LIFTED_PATCH)
+
+
+set_region(region.current(ROOT)[0])
 
 
 def say(msg=''):
@@ -147,12 +159,12 @@ def find_eboot_elf():
 def get_image(args, cfg):
     src = args.get('image') or cfg.get('image')
     if not src or not os.path.exists(src):
-        say('  Pick your Demon\'s Souls (USA, BLUS-30443) disc image (.iso or Redump .zip)...')
+        say('  Pick your Demon\'s Souls disc image (USA BLUS-30443 or Europe BLES-00932; .iso or Redump .zip)...')
         src = pick_file("Demon's Souls disc image", ('iso', 'zip')) or src
     while not src or not os.path.exists(src):
         if src:
             say(f'  not found: {src}')
-        say('  Drag your Demon\'s Souls (USA, BLUS-30443) disc image -- .iso, a Redump .zip,')
+        say('  Drag your Demon\'s Souls (USA BLUS-30443 or Europe BLES-00932) disc image -- .iso, a Redump .zip,')
         say('  or a dumped disc folder that has PS3_GAME in it -- into this window and press Enter:')
         src = ask('  > ')
     return os.path.abspath(src)
@@ -206,7 +218,7 @@ def disc_key(args, image, needs_key, check):
             return k
     say('  This image is encrypted (as Redump images are) and needs its disc key: the 32 hex digits')
     say('  that came with your dump (a .dkey file next to the .iso), or the "Disc Key" on the Redump')
-    say(f'  page for your disc: {REDUMP_PAGE} (Demon\'s Souls USA, BLUS-30443, version 01.00).')
+    say(f'  page for your disc: {REDUMP_PAGE} (Demon\'s Souls {R["name"]}, {R["serial"]}, version 01.00).')
     if os.environ.get('DS_NO_BROWSER') != '1':
         try:
             import webbrowser
@@ -226,6 +238,17 @@ def disc_key(args, image, needs_key, check):
         say('  That key does not decrypt this disc. Check it and try again.')
 
 
+def use_release(title_id):
+    key = region.from_title_id(title_id)
+    if key:
+        set_region(key)
+        say(f'  Demon\'s Souls {R["name"]} ({R["serial"]})')
+    else:
+        set_region(region.DEFAULT)
+        say(f'  WARNING: this disc is {title_id or "not recognised"}; this port supports Demon\'s Souls USA'
+            ' (BLUS-30443) and Europe (BLES-00932). Going on as for the USA disc.')
+
+
 def step_game(args, cfg):
     step(1, 'game files')
     if os.path.isfile(os.path.join(USRDIR, 'EBOOT.BIN')) and os.path.isfile(os.path.join(GAME, '.extracted')):
@@ -233,9 +256,12 @@ def step_game(args, cfg):
     image = get_image(args, cfg)
     cfg['image'] = image; save_config(cfg)
     if os.path.isdir(image):
+        sfo = os.path.join(image, 'PS3_GAME', 'PARAM.SFO')
+        use_release(region.sfo_title_id(open(sfo, 'rb').read()) if os.path.isfile(sfo) else None)
         copy_folder_dump(image)
     else:
         import iso_extract
+        use_release(iso_extract.title_id(image))
         needs_key, check = iso_extract.probe(image)
         key = disc_key(args, image, needs_key, check)
         say('  extracting all game files (about 8 GB, a few minutes)...')
@@ -508,8 +534,9 @@ def step_decrypt(args, cfg):
     h = sha256(eboot)
     if h != EBOOT_BIN_SHA256:
         say(f'  WARNING: EBOOT.BIN is not the tested one (sha256 {h}).')
-        say('  This port is made for Demon\'s Souls USA BLUS-30443 version 1.00 as on the disc; the')
-        say('  patches will most likely not apply to another region or an updated EBOOT.')
+        say(f'  This port is made for Demon\'s Souls {R["name"]} {R["serial"]} version 1.00 as on the disc'
+            ' (or the other supported release);')
+        say('  the patches will most likely not apply to another region or an updated EBOOT.')
         if ask('  Continue anyway? [y/N] ').lower() != 'y':
             sys.exit(1)
     elf = find_eboot_elf()
@@ -635,7 +662,8 @@ def step_ps3recomp():
 
 def lift_inputs():
     """What the recompiled code is made from besides the EBOOT; if this changes, an update needs a
-    full recompile, not just lifted-code.patch again (setup/patch_sync.py)."""
+    full recompile, not just the lifted-code patch again (setup/patch_sync.py). For the US release the string is
+    the same as before region support, so an existing US setup is not recompiled."""
     with open(os.path.join(ROOT, 'tools', 'lift_spurs_jobs.py'), 'rb') as f:
         tool = hashlib.sha256(f.read().replace(b'\r\n', b'\n')).hexdigest()[:16]
     return f'{PS3RECOMP_COMMIT} {" ".join(LIFT_ARGS)} {SPURS_JOBS} {tool}'
@@ -685,13 +713,13 @@ def step_lift():
                     p = os.path.join(d, f); b = open(p, 'rb').read()
                     if b'\r\n' in b:
                         open(p, 'wb').write(b.replace(b'\r\n', b'\n')); n += 1
-    patch = os.path.join(ROOT, 'patches', 'lifted-code.patch')
+    patch = os.path.join(ROOT, 'patches', LIFTED_PATCH)
     # port/ sits inside this repo's checkout: keep git from finding that repo, or it would take the
     # patch's paths as relative to the checkout's top instead of port/
     r = subprocess.run(['git', 'apply', '--whitespace=nowarn', '-p1', patch], cwd=PORT, capture_output=True,
                        text=True, env=dict(os.environ, GIT_CEILING_DIRECTORIES=ROOT))
     if r.returncode:
-        fail(f'patches/lifted-code.patch did not apply:\n{r.stdout}{r.stderr}')
+        fail(f'patches/{LIFTED_PATCH} did not apply:\n{r.stdout}{r.stderr}')
     with open(patch, 'rb') as f:
         patch_sync.save_lifted_state(f.read(), lift_inputs())
     say('  done')
@@ -731,7 +759,7 @@ def main():
     if shutil.which('git') is None:
         fail(f'git is not installed ({SETUP_NAME} normally checks this)')
     cfg = load_config()
-    say("Demon's Souls (BLUS-30443) -- ps3recomp PC port setup")
+    say("Demon's Souls (USA BLUS-30443 / Europe BLES-00932) -- ps3recomp PC port setup")
     step_game(args, cfg)
     step_decrypt(args, cfg)
     step_ps3recomp()

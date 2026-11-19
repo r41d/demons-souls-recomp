@@ -3979,6 +3979,30 @@ Don't run ps3recomp tools with `-P`/`-I`: they import sibling modules from their
     - In game (play.sh, fullscreen 1280x800, DES_BOSS_RUSH=1 DES_BR_SOULS=2, the test save in a scratch boss rush
       folder): with timer_font.bin the game-font timer "0:00.0 / Souls x2" at the bottom centre; without it the
       text overlay at the top. make_boss_rush.py ran on Linux (2.4 s) and wrote bossrush/timer_font.bin.
+158. **The European disc (BLES-00932) builds and plays (2026-11-19, RTX 3070 PC, Linux via Proton):**
+    - Request: support the user's own EU disc as well as the USA one. Its EBOOT is the same build with regional
+      edits: 99.6% of the 73,295 functions are identical with b/bl offsets masked, at shifted addresses (TOC
+      +0x230, .bss +0x280, the SPURS job images byte for byte 0x2100 further into the file).
+    - setup/region.py: everything that differs per release (title id, EBOOT hashes, SPURS jobs, lift arguments,
+      Redump page, lifted patch). The release is read from PARAM.SFO (the image before extraction, the game
+      folder after), failing that the EBOOT hash; a US setup sees exactly the old values, so nothing rebuilds.
+      tools/iso_extract.py reads the plain-region table length from sector 0 (EU 17856 sectors, US 17632),
+      capped at 32768 so a decrypted ISO is never read whole. The native Linux / macOS steps (mac/setup_steps.py)
+      take the release from the image the same way.
+    - patches/lifted-code-eu.patch is derived, not edited: tools/us2eu_map.py maps every US address to its EU one
+      from both EBOOTs, tools/port_patch_eu.py carries each lifted-code.patch hunk over (anchored on the enclosing
+      function, SPU folders renamed, addresses through the map) and writes only a clean run: 214 hunks (main of
+      2026-11-19), 211 ported, 3 frame skip, 0 warnings. The frame-skip fix (72) is built into the porter, as EU func_000CC920 is rewritten with
+      four limits (0x6D twice, 0x69 twice). The header names the US patch's sha256;
+      `port_patch_eu.py --check` says when it is stale. stubs.cpp accepts the three EU TOC values.
+    - Language: the EU EBOOT reads User.Language (sysutil 0x111), which the runtime takes from PS3_LANG
+      (fr, es, de, it; else English) -- the game's own translations.
+    - Checked in a sandbox (own saves): full setup from the dump, logo, title, new character, opening cinematic
+      and tutorial at 30 fps; a save at ~59 fps with the 60 fps step fix active; PS3_LANG=fr official French;
+      0 TOC errors / exceptions. Again after rebasing on main of 2026-11-19 (save, 59 fps, French). Agent reviews: 202 of 208 hunks identical to the US ones with addresses
+      normalised, the rest the frame-skip rewrite. Not checked: boss rush, the remaster mod, Windows itself,
+      the native Linux (Vulkan) and Android builds, macOS, one folder switched between releases; cellLicenseArea still answers A (EU is E); the
+      DS_PPU_O2_UNITS chunk list is from US profiling.
 
 209. **Native Linux / macOS: Storm King beach missing rocks -- fix 64 again, in the draw engine (2026-11-16, user report
     after a full boss rush on the Steam Deck: "missing level geometry in the storm king fight")**

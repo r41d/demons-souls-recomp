@@ -11,13 +11,13 @@ usage: python tools/udf_rename.py <image.iso|image.zip> <game_dir> [--dry-run]
 """
 import struct, sys, os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from iso_extract import open_image   # noqa: E402
+from iso_extract import open_image, read_meta   # noqa: E402
 
 SECT = 2048
 zip_path, game_dir = sys.argv[1], sys.argv[2]
 dry = '--dry-run' in sys.argv
 
-head = open_image(zip_path).read(17632 * SECT)         # plain region 0: both filesystems' metadata
+head = read_meta(open_image(zip_path))[0]             # plain region 0: both filesystems' metadata
 sec = lambda n: head[n * SECT:(n + 1) * SECT]
 u16 = lambda b, o: struct.unpack_from('<H', b, o)[0]
 u32 = lambda b, o: struct.unpack_from('<I', b, o)[0]

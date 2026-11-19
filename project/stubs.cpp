@@ -45,7 +45,8 @@ extern "C" void ds_toc_check(void* p)
 {
     ppu_context* ctx = (ppu_context*)p;
     uint32_t r2 = (uint32_t)ctx->gpr[2];
-    if (r2 == 0x019B5040u || r2 == 0x019D3BACu || r2 == 0x019C448Cu) return;
+    if (r2 == 0x019B5040u || r2 == 0x019D3BACu || r2 == 0x019C448Cu) return;   /* USA BLUS-30443 */
+    if (r2 == 0x019B5270u || r2 == 0x019D3DDCu || r2 == 0x019C46BCu) return;   /* Europe BLES-00932 */
     static int reported = 0;
     if (reported >= 6) return;
     reported++;

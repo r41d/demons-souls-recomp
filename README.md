@@ -1,6 +1,6 @@
 # Demon's Souls — native PC port (ps3recomp)
 
-A native Windows build of **Demon's Souls** (PS3, USA, **BLUS-30443**). The game's PPU and SPU code is statically
+A native Windows build of **Demon's Souls** (PS3, USA **BLUS-30443** or Europe **BLES-00932**). The game's PPU and SPU code is statically
 recompiled to C/C++ with [ps3recomp](https://github.com/sp00nznet/ps3recomp) and runs as a normal x64 program
 on a PS3 runtime and a Direct3D 12 renderer. It is not an emulator.
 
@@ -29,9 +29,11 @@ Hit a stutter or crash? Press **F8** when it happens and run `REPORT.bat` afterw
 
 - **Windows 10/11 x64** with a **Direct3D 12** GPU. AVX2 is used if your CPU has it (Haswell / Ryzen or newer).
 - About **14 GB** free disk space.
-- **Your disc image** of Demon's Souls USA (BLUS-30443): a `.iso`, a Redump `.zip`, or a dumped folder with
-  `PS3_GAME` in it. An encrypted image also needs its **disc key**: the `.dkey` file from the dump, or the
-  "Disc Key" line on [Redump's page for this disc](http://redump.org/disc/16199/).
+- **Your disc image** of Demon's Souls USA (BLUS-30443) or Europe (BLES-00932): a `.iso`, a Redump `.zip`, or a
+  dumped folder with `PS3_GAME` in it. An encrypted image also needs its **disc key**: the `.dkey` file from the
+  dump, or the "Disc Key" line on Redump's page for the disc ([USA](http://redump.org/disc/16199/),
+  [Europe](http://redump.org/disc/28776/)). SETUP tells the two apart by itself. See
+  [European disc](#european-disc-bles-00932).
 - **Nothing else.** SETUP downloads what is missing into `deps\`, with no installer or admin rights: portable
   Python and Git, the PS3 keys for `EBOOT.BIN` (from [RPCS3](https://rpcs3.net)'s public source, kept in
   `%LOCALAPPDATA%`), and a portable LLVM compiler with Microsoft's SDK via
@@ -141,6 +143,18 @@ yourself, on a Linux PC, from your own disc. **Never share the APK**: it contain
 It starts at 30 fps, with no movies, straight to the title screen. Not there yet: 60 fps, movies, the
 on-screen keyboard (the character is named "Slayer"), and rumble. Details, measurements and the open points:
 [docs/ANDROID.md](docs/ANDROID.md).
+
+### European disc (BLES-00932)
+
+SETUP builds the European release too, from your own European disc image: it reads which disc it is and uses
+`patches/lifted-code-eu.patch`, the port's edits carried over to the European EBOOT. The European game picks its
+language from the system language: set **`PS3_LANG=fr`** (or `de`, `es`, `it`; anything else gives English) in the
+launcher's *Extra settings*, or before `PLAY.bat` / `linux/play.sh`. Notes:
+- Use a separate folder for each release. Switching one folder from one disc to the other is not supported.
+- European saves are separate from US ones (the save folders are named after the disc, BLES00932...).
+- Tested on Linux through Proton: setup, a new character into the tutorial at 30 and 60 fps, and the French text.
+  Not tested on the European release yet: boss rush, the PC Remaster mod, and the native Linux, macOS and Android
+  builds.
 
 ## Updating
 
@@ -296,7 +310,8 @@ Everything SETUP produces (`game/`, `port/`, `deps/`, `.venv/`, saves, logs) is 
     firmware first if it asks.
   - In Windows Sandbox or a VM, RPCS3 can crash. Decrypt on another PC, copy `EBOOT.elf` into that folder,
     and rerun SETUP.
-- **"EBOOT.BIN is not the tested one":** only the USA disc (BLUS-30443) is supported.
+- **"EBOOT.BIN is not the tested one":** only the USA (BLUS-30443) and European (BLES-00932) discs, version
+  1.00 as on the disc, are supported.
 - **Build tools not found:** rerun SETUP or BUILD and allow the portable compiler download. Or install VS 2022
   Build Tools with C++ and LLVM (`winget install LLVM.LLVM`), or set `LLVM_DIR`.
 - **Setup seems stuck:** one file can take a minute; see `logs\build_last.txt`. If nothing moves for many
