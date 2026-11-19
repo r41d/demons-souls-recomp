@@ -9920,7 +9920,7 @@ index 3673985..9106980 100644
      setcontext(&f->sched->back);
  #endif
 diff --git a/libs/spurs/cellSpurs.c b/libs/spurs/cellSpurs.c
-index 82ea66c6..579be5a1 100644
+index 82ea66c6..59ebed19 100644
 --- a/libs/spurs/cellSpurs.c
 +++ b/libs/spurs/cellSpurs.c
 @@ -12,6 +12,15 @@
@@ -9965,7 +9965,7 @@ index 82ea66c6..579be5a1 100644
  
      /* Write the REAL big-endian CellSpursTaskset layout (fork Option-B) so the lifted
       * SPU leaf + spurs_pm_build_context read valid data (the native writes above are
-@@ -947,24 +961,35 @@ s32 cellSpursDestroyTaskset(CellSpursTaskset* taskset)
+@@ -947,24 +961,39 @@ s32 cellSpursDestroyTaskset(CellSpursTaskset* taskset)
      return CELL_OK;
  }
  
@@ -9999,12 +9999,16 @@ index 82ea66c6..579be5a1 100644
 +    /* Wait for the taskset's tasks to stop (they were told to by Shutdown), so
 +     * none survives into memory the title frees or re-uses right after. */
 +    extern long spu_taskset_join(uint32_t);
-+    spu_taskset_join(taskset_ea);
-+    printf("[cellSpurs] JoinTaskset() ea=0x%08X completed\n", taskset_ea);
++    const long left = spu_taskset_join(taskset_ea);
++    if (left > 0)
++        printf("[cellSpurs] JoinTaskset() ea=0x%08X -- %ld task(s) still running at the join limit "
++               "(PS3RECOMP_JOIN_WAIT_MS)\n", taskset_ea, left);
++    else
++        printf("[cellSpurs] JoinTaskset() ea=0x%08X completed\n", taskset_ea);
      return CELL_OK;
  }
  
-@@ -1017,6 +1042,14 @@ s32 cellSpursCreateTask(CellSpursTaskset* taskset, CellSpursTaskId* taskId,
+@@ -1017,6 +1046,14 @@ s32 cellSpursCreateTask(CellSpursTaskset* taskset, CellSpursTaskId* taskId,
      uint32_t taskset_ea = (uint32_t)(uintptr_t)taskset;
      uint32_t elf_ea     = (uint32_t)(uintptr_t)elf;
      uint32_t context_ea = (uint32_t)(uintptr_t)context;
@@ -10019,7 +10023,7 @@ index 82ea66c6..579be5a1 100644
  
      /* taskId/taskset are guest EAs; translate before deref. elf/context stay
       * guest EAs (handled below — elf is translated for load, context kept EA). */
-@@ -1085,7 +1118,7 @@ s32 cellSpursCreateTask(CellSpursTaskset* taskset, CellSpursTaskId* taskId,
+@@ -1085,7 +1122,7 @@ s32 cellSpursCreateTask(CellSpursTaskset* taskset, CellSpursTaskId* taskId,
              g_ydkj_real_taskset_ea = taskset_ea;
              g_ydkj_real_taskid     = i;
  
@@ -10028,7 +10032,7 @@ index 82ea66c6..579be5a1 100644
                     " ctx=0x%08X lsp=%08X %08X %08X %08X)\n",
                     s_tasks[i].id, elf, task_arg[0], task_arg[1], task_arg[2], task_arg[3],
                     context_ea, task_lsp[0], task_lsp[1], task_lsp[2], task_lsp[3]);
-@@ -1157,11 +1190,18 @@ s32 cellSpursCreateTask(CellSpursTaskset* taskset, CellSpursTaskId* taskId,
+@@ -1157,11 +1194,18 @@ s32 cellSpursCreateTask(CellSpursTaskset* taskset, CellSpursTaskId* taskId,
                   * as the guest EA (the SPU job's DMA uses guest EAs / r3). */
                  const uint8_t* host_elf = GUEST_PTR(elf, const uint8_t*);
                  size_t sz = spu_elf_image_size(host_elf, 2u * 1024 * 1024);
@@ -10048,7 +10052,7 @@ index 82ea66c6..579be5a1 100644
              }
              return CELL_OK;
          }
-@@ -1216,8 +1256,9 @@ s32 _cellSpursTaskAttributeInitialize(CellSpursTaskAttribute* attr, u32 revision
+@@ -1216,8 +1260,9 @@ s32 _cellSpursTaskAttributeInitialize(CellSpursTaskAttribute* attr, u32 revision
        if (s_r8) {
            attr->argument_ea  = (u32)sizeContext;   /* r8 */
            attr->lsPattern_ea = 0;                  /* r9 was a leftover */
@@ -10060,7 +10064,7 @@ index 82ea66c6..579be5a1 100644
        } }
      /* SPURS_TASKATTR_DESC: a THIRD caller shape, found in Saints Row 2. Its
       * taskset builder (func_009F56E0) does not pass eaContext/sizeContext/
-@@ -1250,7 +1291,7 @@ s32 _cellSpursTaskAttributeInitialize(CellSpursTaskAttribute* attr, u32 revision
+@@ -1250,7 +1295,7 @@ s32 _cellSpursTaskAttributeInitialize(CellSpursTaskAttribute* attr, u32 revision
                   d, (u32)attr->eaContext, attr->sizeContext,
                   attr->lsPattern_ea, attr->argument_ea);
        } }
@@ -10069,7 +10073,7 @@ index 82ea66c6..579be5a1 100644
             (u32)eaElf, (u32)eaContext, sizeContext,
             attr->lsPattern_ea, attr->argument_ea);
      return CELL_OK;
-@@ -2127,6 +2168,15 @@ s32 cellSpursEventFlagWait(CellSpursEventFlag* eventFlag, u16* bits,
+@@ -2127,6 +2172,15 @@ s32 cellSpursEventFlagWait(CellSpursEventFlag* eventFlag, u16* bits,
                              (unsigned long)GetCurrentThreadId(), waits / 500, pattern,
                              mode == CELL_SPURS_EVENT_FLAG_AND ? "AND" : "OR",
                              current, ea);
@@ -10085,7 +10089,7 @@ index 82ea66c6..579be5a1 100644
                      fflush(stderr);
                  }
              }
-@@ -2257,7 +2307,7 @@ s32 _cellSpursEventFlagInitialize(void* spurs, void* taskset,
+@@ -2257,7 +2311,7 @@ s32 _cellSpursEventFlagInitialize(void* spurs, void* taskset,
  s32 _cellSpursSendSignal(void* taskset, u32 taskId)
  {
      uint32_t taskset_ea = (uint32_t)(uintptr_t)taskset;
@@ -10094,7 +10098,7 @@ index 82ea66c6..579be5a1 100644
      /* Real delivery now that SPU tasks execute (comment was stale). */
      if (taskset_ea) spu_taskset_signal_task(taskset_ea, taskId);
      return CELL_OK;
-@@ -2340,6 +2390,7 @@ s32 _cellSpursJobChainAttributeInitialize(u32 jmRevision, u32 sdkRevision, u64 a
+@@ -2340,6 +2394,7 @@ s32 _cellSpursJobChainAttributeInitialize(u32 jmRevision, u32 sdkRevision, u64 a
      vm_write32((u32)attr_ea + JCATTR_MAX_SIZE_D, 0);
      vm_write32((u32)attr_ea + JCATTR_INIT_SPU,   0);
      vm_write32((u32)attr_ea + JCATTR_NAME,       0);
@@ -10102,7 +10106,7 @@ index 82ea66c6..579be5a1 100644
      printf("[cellSpurs] _JobChainAttributeInitialize(attr=0x%08X entry=0x%08X sizeDesc=%u maxGrab=%u maxCont=%u)\n",
             (u32)attr_ea, (u32)entry_ea, sizeJobDescriptor, maxGrabbedJob, maxContention);
      return CELL_OK;
-@@ -2394,6 +2445,7 @@ s32 cellSpursCreateJobChainWithAttribute(u64 spurs_ea, u64 jc_ea, u64 attr_ea)
+@@ -2394,6 +2449,7 @@ s32 cellSpursCreateJobChainWithAttribute(u64 spurs_ea, u64 jc_ea, u64 attr_ea)
          }
          _n++;
      }
@@ -10110,7 +10114,7 @@ index 82ea66c6..579be5a1 100644
      printf("[cellSpurs] CreateJobChainWithAttribute(jc=0x%08X entry=0x%08X sizeDesc=%u maxGrab=%u name=\"%s\")\n",
             (u32)jc_ea, entry, sd_mg >> 16, sd_mg & 0xFFFFu,
             name_ea ? (const char*)(vm_base + name_ea) : "-");
-@@ -2683,6 +2735,16 @@ static void jc_signal_done(u32 jc_ea, int job_index)
+@@ -2683,6 +2739,16 @@ static void jc_signal_done(u32 jc_ea, int job_index)
       * so a data2 pinned at 0 never ends that loop -- with the chain's lwmutex
       * held, which blocks the main thread's teardown behind it. A chain-level
       * signal (job_index < 0) sends 0. */
@@ -10127,7 +10131,7 @@ index 82ea66c6..579be5a1 100644
      u64 d2 = (u64)(unsigned)(job_index < 0 ? 0 : job_index);
      u64 mbox = 0, d3 = 0;
      (void)spurs_event_data3_probe();   /* prime d3_probe_valid */
-@@ -2760,7 +2822,8 @@ static void jc_execute(u32 entry_ea, u32 jc_ea, u32 size_desc)
+@@ -2760,7 +2826,8 @@ static void jc_execute(u32 entry_ea, u32 jc_ea, u32 size_desc)
          if (op == 4) { ret_pc = pc + 8; pc = (u32)(cmd & ~7ull); continue; }  /* CALL */
          if (op == 7) {
              if (ext == (7 | (15 << 3))) {                     /* END */
@@ -10137,7 +10141,7 @@ index 82ea66c6..579be5a1 100644
                  if (jobs) jc_signal_done(jc_ea, jobs - 1);
                  return;
              }
-@@ -2778,8 +2841,33 @@ static void jc_execute(u32 entry_ea, u32 jc_ea, u32 size_desc)
+@@ -2778,8 +2845,33 @@ static void jc_execute(u32 entry_ea, u32 jc_ea, u32 size_desc)
              if (!jg_wait(g_ea)) return;                  /* still closed */
              pc += 8; continue;
          }
@@ -10172,7 +10176,7 @@ index 82ea66c6..579be5a1 100644
          pc += 8;
      }
      printf("[cellSpurs] chain 0x%08X: 4096 commands with no job run after %d "
-@@ -2828,7 +2916,7 @@ static s32 jc_start(u64 jc_ea, const char* who)
+@@ -2828,7 +2920,7 @@ static s32 jc_start(u64 jc_ea, const char* who)
      for (int i = 0; i < MAX_JOBCHAINS; i++) {
          if (s_jobchains[i].jc_ea != (u32)jc_ea) continue;
          s_jobchains[i].run_count++;
@@ -10181,7 +10185,7 @@ index 82ea66c6..579be5a1 100644
              printf("[cellSpurs] %s(jc=0x%08X) run#%d entry=0x%08X\n",
                     who, (u32)jc_ea, s_jobchains[i].run_count, s_jobchains[i].entry_ea);
              jc_dump_commands(who, s_jobchains[i].entry_ea, 16);
-@@ -2937,42 +3025,45 @@ s32 cellSpursKickJobChain(u64 jc_ea, u32 numReadyCount)
+@@ -2937,42 +3029,45 @@ s32 cellSpursKickJobChain(u64 jc_ea, u32 numReadyCount)
  s32 _cellSpursQueueInitialize(u64 spurs_ea, u64 taskset_ea, u64 queue_ea,
                                u64 buffer_ea, u32 size, u32 depth, u32 direction)
  {
@@ -10259,7 +10263,7 @@ index 82ea66c6..579be5a1 100644
      return CELL_OK;
  }
  
-@@ -3446,6 +3537,28 @@ s32 _cellSpursLFQueueInitialize(u64 owner_ea, u64 queue_ea, u64 buffer_ea,
+@@ -3446,6 +3541,28 @@ s32 _cellSpursLFQueueInitialize(u64 owner_ea, u64 queue_ea, u64 buffer_ea,
      uint32_t q = (uint32_t)queue_ea;
      for (uint32_t o = 0; o < 128; o += 4) vm_write32(q + o, 0);
  
@@ -10288,7 +10292,7 @@ index 82ea66c6..579be5a1 100644
      /* W3 at +0x0C is the ring modulus the consumer reduces indices by: the
       * empty test is (W1-W0) mod 2*W3 and the buffer slot is index mod W3
       * (derived at 0x12914..0x129B8). Leaving it zero degenerated both and made
-@@ -3479,3 +3592,202 @@ s32 cellSpursLFQueueAttachLv2EventQueue(u64 queue_ea)
+@@ -3479,3 +3596,202 @@ s32 cellSpursLFQueueAttachLv2EventQueue(u64 queue_ea)
      if (PS3_LOG_FIRST(_n, 8)) printf("[cellSpurs] LFQueueAttachLv2EventQueue(q=0x%08X)\n", (u32)queue_ea);
      return CELL_OK;
  }
@@ -37006,7 +37010,7 @@ index f04fda63..5a808252 100644
 +
  #endif /* SPU_HELPERS_H */
 diff --git a/runtime/spu/spu_workload.c b/runtime/spu/spu_workload.c
-index 3ce8d0d6..24b9ddcc 100644
+index 3ce8d0d6..38f2b29f 100644
 --- a/runtime/spu/spu_workload.c
 +++ b/runtime/spu/spu_workload.c
 @@ -5,9 +5,18 @@
@@ -37317,7 +37321,7 @@ index 3ce8d0d6..24b9ddcc 100644
          spu_workload_dispatch_async(vm_base + start_elf[i], (uint32_t)start_sz[i], start_ctx[i]);
      }
      s_ts_held = 0; ts_unlock();
-@@ -640,8 +698,221 @@ void spu_taskset_start_pending(uint32_t taskset_ea)
+@@ -640,8 +698,230 @@ void spu_taskset_start_pending(uint32_t taskset_ea)
      if (taskset_ea) spu_taskset_task_exited(taskset_ea, 0xFFFFFFFFu);
  }
  
@@ -37448,14 +37452,23 @@ index 3ce8d0d6..24b9ddcc 100644
 +    return n;
 +}
 +
-+/* A join owns the taskset lifetime until every accepted job has stopped.
-+ * A diagnostic deadline must never let the guest reuse memory with live jobs.
-+ * Keep periodic wakeups and warnings, but return only after real completion. */
++/* A join waits until every accepted job has stopped, so the guest does not reuse memory a live job still writes.
++ * By default it gives up after 3 s and returns how many are still alive (the behaviour before fix 305): shutdown
++ * only reaches a task at an atomic, WAIT_SIGNAL or a yield/poll, so a task blocked anywhere else would otherwise
++ * freeze the game in the join for good. PS3RECOMP_JOIN_WAIT_MS sets the limit in ms; 0 waits without one (fix 305's
++ * behaviour, the default under mac/play.sh). */
 +long spu_taskset_join(uint32_t ea)
 +{
++    static long limit_ms = -1;
++    if (limit_ms < 0) {
++        const char* e = getenv("PS3RECOMP_JOIN_WAIT_MS");
++        const long v = (e && *e) ? atol(e) : 3000;
++        limit_ms = v < 0 ? 3000 : v;
++    }
 +    for (uint64_t polls = 0;; polls++) {
 +        const long left = ts_live_count(ea);
 +        if (left <= 0) { ts_run_release(ea); return 0; }
++        if (limit_ms && polls >= (uint64_t)limit_ms) return left;
 +        if (polls % 50 == 0) spu_taskset_wake_all();
 +        if (polls && polls % 3000 == 0)
 +            fprintf(stderr, "[taskset] join 0x%08X still waiting for %ld accepted job(s)\n", ea, left);
@@ -37539,7 +37552,7 @@ index 3ce8d0d6..24b9ddcc 100644
      spu_taskset_mark(j->taskset_ea, j->taskid, 1);
      /* Persistent per-taskset LS: acquire (+serialize) the taskset's LS, or fall
       * back to a fresh per-dispatch LS when disabled / no taskset. */
-@@ -839,9 +1110,10 @@ static void spu_async_run(spu_async_job* j)
+@@ -839,9 +1119,10 @@ static void spu_async_run(spu_async_job* j)
                   * both audio tasks run task 1's descriptor). */
                  if (j->taskset_ea) {
                      spurs_pm_build_context(ls, j->taskset_ea, j->taskid, 0, 0);
@@ -37553,7 +37566,7 @@ index 3ce8d0d6..24b9ddcc 100644
                  }
              }
              /* ---- Bink-layer probe + real-policy A/B (image 3 = binkspu) ----
-@@ -979,8 +1251,9 @@ static void spu_async_run(spu_async_job* j)
+@@ -979,8 +1260,9 @@ static void spu_async_run(spu_async_job* j)
                    FILE* f = fopen(path, "wb");
                    if (f) { fwrite(ls, 1, SPU_LS_SIZE, f); fclose(f);
                        fprintf(stderr, "[spu_workload] wrote local store -> %s\n", path); } } }
@@ -37565,7 +37578,7 @@ index 3ce8d0d6..24b9ddcc 100644
              spu_serial_release();
              if (j->taskset_ea) spu_taskset_task_exited(j->taskset_ea, j->taskid);
          }
-@@ -998,23 +1271,252 @@ static void spu_async_run(spu_async_job* j)
+@@ -998,23 +1280,252 @@ static void spu_async_run(spu_async_job* j)
      free(j);
  }
  
@@ -37825,7 +37838,7 @@ index 3ce8d0d6..24b9ddcc 100644
  #endif
  
  int spu_workload_dispatch_job(const uint8_t* image, uint32_t image_size,
-@@ -1067,7 +1569,7 @@ int spu_workload_dispatch_job(const uint8_t* image, uint32_t image_size,
+@@ -1067,7 +1578,7 @@ int spu_workload_dispatch_job(const uint8_t* image, uint32_t image_size,
       * lock, and it starved the guest threads competing for that lock badly
       * enough to change what the title does (see ps3_log.h). Milestones stay;
       * the per-job pair is verbose-only. */
@@ -37834,7 +37847,7 @@ index 3ce8d0d6..24b9ddcc 100644
      if (verbose) {
          fprintf(stderr, "[spurs-job] dispatch HIT fp=0x%016llX image=%d job=0x%08X\n",
                  (unsigned long long)fp, image_id, job_ea);
-@@ -1113,7 +1615,6 @@ int spu_workload_dispatch_job(const uint8_t* image, uint32_t image_size,
+@@ -1113,7 +1624,6 @@ int spu_workload_dispatch_job(const uint8_t* image, uint32_t image_size,
   *     the guest bit is set under the same lock the waiter checks it).
   * The bitset is guest state (SPU-visible); the host lock/condvar exist only
   * to block and wake the task's host thread. */
@@ -37842,7 +37855,7 @@ index 3ce8d0d6..24b9ddcc 100644
  #include "spu_coherency.h"
  
  #ifdef _WIN32
-@@ -1124,63 +1625,102 @@ static pthread_mutex_t s_sig_lock = PTHREAD_MUTEX_INITIALIZER;
+@@ -1124,63 +1634,102 @@ static pthread_mutex_t s_sig_lock = PTHREAD_MUTEX_INITIALIZER;
  static pthread_cond_t  s_sig_cv   = PTHREAD_COND_INITIALIZER;
  #endif
  
@@ -37995,7 +38008,7 @@ index 3ce8d0d6..24b9ddcc 100644
  }
  
  /* Event bits owed to a task, keyed by the OBJECT it waits on (flag - 0x80).
-@@ -1190,30 +1730,40 @@ void spu_taskset_parked_del(uint32_t taskset_ea, uint32_t taskId)
+@@ -1190,30 +1739,40 @@ void spu_taskset_parked_del(uint32_t taskset_ea, uint32_t taskId)
   * path was never parked for the Set to target. So the Set only RECORDS what is
   * owed, and the WAIT_SIGNAL handler writes it into guest memory just before it
   * hands control back -- at which point the guest cannot yet have read it. */
@@ -38052,7 +38065,7 @@ index 3ce8d0d6..24b9ddcc 100644
  }
  
  /* A direction-2 Set that finds NOBODY parked yet is a lost wakeup: the task
-@@ -1221,44 +1771,62 @@ uint16_t spu_ef_bits_take(uint32_t obj)
+@@ -1221,44 +1780,62 @@ uint16_t spu_ef_bits_take(uint32_t obj)
   * one pending wake per taskset; the next task to park consumes it instead of
   * sleeping. One bit, not a counter -- SPURS signals are latched, not queued, so
   * two Sets before a park must not buy two passes through the wait. */
@@ -38138,7 +38151,7 @@ index 3ce8d0d6..24b9ddcc 100644
  }
  
  /* Set or clear a task's bit in the guest `signalled` bitset from a host thread.
-@@ -1298,15 +1866,26 @@ static void spu_signalled_update(uint32_t taskset_ea, uint32_t taskId, int set)
+@@ -1298,15 +1875,26 @@ static void spu_signalled_update(uint32_t taskset_ea, uint32_t taskId, int set)
  static void spu_taskset_wake_written(void* opaque)
  {
      (void)opaque;
@@ -38174,7 +38187,7 @@ index 3ce8d0d6..24b9ddcc 100644
  }
  
  /* Deliver a signal to a task (callable from any PPU/host thread). */
-@@ -1317,14 +1896,14 @@ void spu_taskset_signal_task(uint32_t taskset_ea, uint32_t taskId)
+@@ -1317,14 +1905,14 @@ void spu_taskset_signal_task(uint32_t taskset_ea, uint32_t taskId)
       * lock-line and take s_sig_lock, so lock-line must never nest inside it. */
      spu_signalled_update(taskset_ea, taskId, 1);
      spu_taskset_wake_written(NULL);
@@ -38193,7 +38206,7 @@ index 3ce8d0d6..24b9ddcc 100644
            extern unsigned long long ps3_ms_now(void);
            const uintptr_t c = (uintptr_t)__builtin_return_address(0);
            for (int i = 0; i < 32; i++) {
-@@ -1357,26 +1936,15 @@ void spu_taskset_signal_task(uint32_t taskset_ea, uint32_t taskId)
+@@ -1357,26 +1945,15 @@ void spu_taskset_signal_task(uint32_t taskset_ea, uint32_t taskId)
   * re-checks. */
  void spu_taskset_line_committed(uint32_t line)
  {
@@ -38228,7 +38241,7 @@ index 3ce8d0d6..24b9ddcc 100644
  }
  
  /* WAIT_SIGNAL from the task side (runs ON the task's host thread, called by
-@@ -1389,12 +1957,19 @@ int spu_taskset_wait_signal(uint32_t taskset_ea, uint32_t taskId)
+@@ -1389,12 +1966,19 @@ int spu_taskset_wait_signal(uint32_t taskset_ea, uint32_t taskId)
       * per round) -- decisive for "is the Bink decode CPU-bound". TLS: each
       * task runs on its own host thread. */
      static _Thread_local unsigned long long s_wait_exit_ms;
@@ -38252,7 +38265,7 @@ index 3ce8d0d6..24b9ddcc 100644
      /* LBP_SYNC_ACK: taskset sync-lane bookkeeping. On real SPURS the taskset
       * POLICY MODULE advances the per-SPU progress lanes (sync+0x40+16*row:
       * ticket u16 @+0, consumer lanes @+2..) as tasks are processed; our HLE
-@@ -1442,46 +2017,56 @@ int spu_taskset_wait_signal(uint32_t taskset_ea, uint32_t taskId)
+@@ -1442,46 +2026,56 @@ int spu_taskset_wait_signal(uint32_t taskset_ea, uint32_t taskId)
      spu_lockline_lock();
      spu_coh_watch_add(&watch, taskset_ea + CSTS_SIGNALLED, spu_taskset_wake_written, NULL);
      spu_lockline_unlock();
@@ -38335,7 +38348,7 @@ index 3ce8d0d6..24b9ddcc 100644
  int spu_workload_dispatch_async(const uint8_t* image, uint32_t image_size,
                                  uint32_t args_ea)
  {
-@@ -1529,7 +2114,18 @@ int spu_workload_dispatch_async(const uint8_t* image, uint32_t image_size,
+@@ -1529,7 +2123,18 @@ int spu_workload_dispatch_async(const uint8_t* image, uint32_t image_size,
       * the next CreateTask overwriting the single-slot globals -- with two audio
       * tasks that made both run task 1's descriptor. */
      { extern uint32_t g_ydkj_real_taskset_ea, g_ydkj_real_taskid;
@@ -38355,7 +38368,7 @@ index 3ce8d0d6..24b9ddcc 100644
      /* Mark the task running NOW, not when its thread starts: in that gap another
       * task's exit saw it ready-but-not-running and started it a second time
       * (Twisted Metal's level-load inflate tasks each ran twice, concurrently). */
-@@ -1548,7 +2144,7 @@ int spu_workload_dispatch_async(const uint8_t* image, uint32_t image_size,
+@@ -1548,7 +2153,7 @@ int spu_workload_dispatch_async(const uint8_t* image, uint32_t image_size,
          if ((j->r3[0] >> 16) == 0x40) j->have_r3 = 1;   /* valid marker */
      }
  
@@ -38364,7 +38377,7 @@ index 3ce8d0d6..24b9ddcc 100644
          "[spu_workload] dispatch HIT (async) fp=0x%016llX args=0x%08X image=%d -> spawning thread\n",
          (unsigned long long)fp, args_ea, image_id);
      if (args_ea) { extern uint8_t* vm_base; const uint8_t* c = vm_base + args_ea;
-@@ -1577,20 +2173,29 @@ int spu_workload_dispatch_async(const uint8_t* image, uint32_t image_size,
+@@ -1577,20 +2182,29 @@ int spu_workload_dispatch_async(const uint8_t* image, uint32_t image_size,
                  fprintf(stderr, "\n");
              } } }
  
@@ -38395,7 +38408,7 @@ index 3ce8d0d6..24b9ddcc 100644
      pthread_t th;
      pthread_attr_t attr;
      pthread_attr_init(&attr);
-@@ -1603,8 +2208,71 @@ int spu_workload_dispatch_async(const uint8_t* image, uint32_t image_size,
+@@ -1603,8 +2217,71 @@ int spu_workload_dispatch_async(const uint8_t* image, uint32_t image_size,
       * beats never dispatching at all. */
      if (prc != 0)
          prc = pthread_create(&th, NULL, spu_async_thread, j);

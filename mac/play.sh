@@ -91,6 +91,9 @@ export GCM_NO_TITLE_RECYCLE=1 PS3_NP_STRICT_OFFLINE=1 SPU_INTERP_UNLIFTED=1 SPUR
 # Windows because it was only measured there). On an M2 Pro: the same 60 fps with about half a core
 # less (NOTES fix 301). SPU_DISPQ_WAIT=0 is the old spin.
 export SPU_DISPQ_WAIT="${SPU_DISPQ_WAIT:-1}"
+# cellSpursJoinTaskset waits for a shut-down taskset's jobs. Windows / Linux give up after 3 s (NOTES fix 159); the Mac
+# keeps fix 305's wait without a limit, which is what was tested here. PS3RECOMP_JOIN_WAIT_MS=3000 gives the Mac the limit.
+export PS3RECOMP_JOIN_WAIT_MS="${PS3RECOMP_JOIN_WAIT_MS:-0}"
 export PS3_INPUT_MAP="${PS3_INPUT_MAP:-$D/mac/input.toml}"
 # Translated shaders (HLSL -> SPIR-V -> MSL) kept on disk, as deadpool-recomp's run.sh does: a new
 # material hitches the game the first time it is ever seen, not once per run. macOS keeps the compiled

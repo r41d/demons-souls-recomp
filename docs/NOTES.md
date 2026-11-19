@@ -4063,6 +4063,20 @@ Don't run ps3recomp tools with `-P`/`-I`: they import sibling modules from their
       the native Linux (Vulkan) and Android builds, macOS, one folder switched between releases; cellLicenseArea still answers A (EU is E); the
       DS_PPU_O2_UNITS chunk list is from US profiling.
 
+159. **cellSpursJoinTaskset gives up after 3 s again on Windows / Linux (2026-11-19, RTX 3070 PC, Linux via Proton):**
+    - Fix 305 (PR 53) made spu_taskset_join wait without a limit, so a joined taskset never hands its memory back
+      while a job still writes to it. But shutdown only reaches a task at a lock-line atomic, WAIT_SIGNAL or a
+      yield / poll; a task blocked anywhere else keeps the live count above 0, and the PPU thread would then sit
+      in the join for good -- a hang instead of the old 3 s stall. Logs from this PC (main, 2026-11-11) show the
+      old limit firing ten times in a row on one taskset during save writes, so the case is not theoretical.
+    - spu_taskset_join: back to the 3 s limit by default, returning how many jobs are still alive;
+      cellSpursJoinTaskset logs "N task(s) still running at the join limit (PS3RECOMP_JOIN_WAIT_MS)" when it
+      fires. PS3RECOMP_JOIN_WAIT_MS sets the limit in ms, 0 waits without one. mac/play.sh sets 0, so the Mac keeps
+      fix 305's tested behaviour. Fix 305's wakeups and "still waiting" warnings are unchanged.
+    - Checked (sandbox, US disc, boot -> profile -> tutorial -> inventory / system / options menus): default
+      limit, 164 joins, all completed, same screens as fix 305; PS3RECOMP_JOIN_WAIT_MS=1, the limit fires once
+      with the new log line and the game carries on. Not checked: native Windows, the Mac (play.sh change only).
+
 209. **Native Linux / macOS: Storm King beach missing rocks -- fix 64 again, in the draw engine (2026-11-16, user report
     after a full boss rush on the Steam Deck: "missing level geometry in the storm king fight")**
     - rsx_draw_engine.c (Vulkan and Metal) queued a draw's DRAW_ARRAYS / DRAW_INDEX_ARRAY packets in
