@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <string>
+#include <time.h>
 #ifdef _WIN32
 #include <windows.h>
 #define COOP_SEP "\\"
@@ -89,6 +90,14 @@ unsigned long long file_time(const std::string& p)
 }
 }  // namespace
 
+namespace {
+extern int g_guest_blk;
+extern int g_keep_state;
+extern int g_press;
+int host_fresh(int* blk, float* xyz);
+int same_map(int a, int b);
+}
+
 extern "C" int coop_mode(void)
 {
     init();
@@ -109,6 +118,8 @@ extern "C" int coop_poll(void)
     if (key_edge(0x76 /* F7 */)) { g_join_state = 0; return 1; }
     if (!g_auto || t < g_next_us) return 0;
     g_next_us = t + 3000000ull;
+    { int hb = -1;      /* not while the host is known to be in another map (see "Following the host") */
+      if (host_fresh(&hb, 0) && g_guest_blk >= 0 && !same_map(hb, g_guest_blk)) return 0; }
     const unsigned long long ft = file_time(key_path());
     if (!ft) return 0;
     if (ft != g_key_mtime) { g_key_mtime = ft; g_join_state = 0; }
@@ -173,17 +184,140 @@ extern "C" void coop_host_pos(int blk, const float* xyz)
 #endif
 }
 
+/* Following the host between maps. A join only works with both players in the same map (in another one the game's
+ * own join fails: OnFailedJoinSession, over and over, and the host re-creates its room each time). So the guest
+ * joins only when the host's position file is fresh and names the guest's own map; the co-op script module moves
+ * the guest to the host's map first (coop.lua, COOP_Follow*), asking through coop_lua_query:
+ *   get follow      0 = wait, 1 = the host is in another map (host_area / host_block say which),
+ *                   2 = no sign of the host for a minute since "lost" was set
+ *   get host_area, get host_block */
+namespace {
+int g_guest_blk = -1;                   /* the guest's own map block, from the step hook */
+unsigned long long g_lost_us = 0;       /* when the script said the session was lost */
+
+/* the host's block and position, when the host wrote them within the last 4 seconds */
+int host_fresh(int* blk, float* xyz)
+{
+    const std::string p = g_dir + COOP_SEP "host_pos.txt";
+#ifdef _WIN32
+    WIN32_FILE_ATTRIBUTE_DATA a;
+    FILETIME now;
+    if (!GetFileAttributesExA(p.c_str(), GetFileExInfoStandard, &a)) return 0;
+    GetSystemTimeAsFileTime(&now);
+    const unsigned long long t0 = ((unsigned long long)a.ftLastWriteTime.dwHighDateTime << 32) | a.ftLastWriteTime.dwLowDateTime;
+    const unsigned long long t1 = ((unsigned long long)now.dwHighDateTime << 32) | now.dwLowDateTime;
+    if (t1 - t0 > 40000000ull) return 0;
+#else
+    struct stat st;
+    if (stat(p.c_str(), &st) || time(NULL) - st.st_mtime > 4) return 0;
+#endif
+    FILE* f = fopen(p.c_str(), "r");
+    if (!f) return 0;
+    float v[3];
+    const int n = fscanf(f, "%d %f %f %f", blk, &v[0], &v[1], &v[2]);
+    fclose(f);
+    if (n != 4) return 0;
+    if (xyz) memcpy(xyz, v, sizeof v);
+    return 1;
+}
+int same_map(int a, int b) { return (a & 0xFFFF) == (b & 0xFFFF); }
+}  // namespace
+
+extern "C" void coop_guest_blk(int blk) { g_guest_blk = blk; }
+
+/* The guest's souls across the map load it makes by itself to follow the host. That load added souls nobody
+ * earned (4102 -> 8611 in the tests, 6361 in one; no script of ours ran in between, with or without the switch to
+ * soul form; g_Initialize's AddBlockClearBonus, "souls not obtained yet", is the suspect). The script says
+ * souls_keep 1 before it starts the warp and 2 once the map is in; the step hook passes the current count and
+ * writes back what this returns when it is not -1. */
+namespace { int g_keep_state = 0, g_keep = -1, g_regroup = 0; }
+
+/* "<name> has left." on the guest (event text 20001020) is a box that waits for OK, shown every time the host
+ * changes map. It is not opened by the scripts (OnLeavePlayer never runs) and proxy:CloseMenu() leaves it up, so
+ * the script asks for the button instead: "set press_ok 1" while it sees an info box at the moments it expects
+ * that one. The step hook then holds CROSS for a few steps, lets go, and says when it is done.
+ * Returns the pad mask to inject, or ~0u when there is nothing to do. */
+namespace { int g_press = 0; }
+extern "C" unsigned coop_pad_inject(void)
+{
+    if (g_press <= 0) return ~0u;
+    g_press--;
+    return g_press >= 12 ? 0x4000u : 0u;     /* 6 steps down (CROSS), 12 steps up */
+}
+extern "C" int coop_souls_fix(int now)
+{
+    if (g_keep_state == 1) { g_keep = now; g_keep_state = 3; return -1; }      /* remembered, waiting for the load */
+    if (g_keep_state == 2) {
+        g_keep_state = 0;
+        const int was = g_keep;
+        g_keep = -1;
+        return was >= 0 && now != was ? was : -1;
+    }
+    return -1;
+}
+
 extern "C" int coop_guest_host_pos(int* blk, float* xyz)
 {
     static unsigned long long next;
     const unsigned long long t = ps3_qpc_us();
-    if (g_mode != 2 || g_join_state != 1 || t < next) return 0;
+    if (g_mode != 2 || t < next) return 0;
+    if (g_regroup) {             /* "set regroup 1": a guest that went down gets up next to the host (returns 2) */
+        next = t + 250000ull;
+        if (!host_fresh(blk, xyz) || !same_map(*blk, g_guest_blk)) return 0;
+        g_regroup = 0;
+        return 2;
+    }
+    if (g_join_state != 1) return 0;
     next = t + 250000ull;
     FILE* f = fopen((g_dir + COOP_SEP "host_pos.txt").c_str(), "r");
     if (!f) return 0;
     const int n = fscanf(f, "%d %f %f %f", blk, &xyz[0], &xyz[1], &xyz[2]);
     fclose(f);
     return n == 4;
+}
+
+/* What the co-op script module (tools/coop/coop.lua) keeps across map loads: named numbers. Its script globals
+ * are gone after every load, and the event flags it could use are rolled back on the guest's way home.
+ *   print("COOPQ set <name> <number>")   -> the number
+ *   print("COOPQ get <name>")            -> the number, 0 when never set
+ * (the scripts' print returns the answer: func_00C02C78 in patches/lifted-code.patch). In memory only: a game
+ * closed in the middle of a session loses it. */
+extern "C" double coop_lua_query(const char* q)
+{
+    static struct { char name[40]; double v; } kv[128];
+    static int n;
+    char op[8] = "", name[40] = "";
+    double v = 0;
+    const int got = sscanf(q, "%7s %39s %lf", op, name, &v);
+    if (got < 2) return 0;
+    if (!strcmp(op, "get") && (!strcmp(name, "follow") || !strcmp(name, "host_area") || !strcmp(name, "host_block"))) {
+        int hb = -1;
+        const int fresh = host_fresh(&hb, 0);
+        if (name[0] == 'h') return !fresh ? -1 : name[5] == 'a' ? (double)((hb >> 8) & 0xFF) : (double)(hb & 0xFF);
+        if (fresh) { g_lost_us = ps3_qpc_us(); return g_guest_blk >= 0 && !same_map(hb, g_guest_blk) ? 1 : 0; }
+        return g_lost_us && ps3_qpc_us() - g_lost_us > 60000000ull ? 2 : 0;
+    }
+    if (!strcmp(op, "set") && !strcmp(name, "lost") && v == 1) g_lost_us = ps3_qpc_us();
+    if (!strcmp(op, "get") && !strcmp(name, "mode")) return g_mode;       /* 1 host, 2 guest */
+    if (!strcmp(op, "set") && !strcmp(name, "press_ok")) { if (g_press <= 0) g_press = 18; return v; }   /* coop_pad_inject */
+    if (!strcmp(op, "set") && !strcmp(name, "regroup")) { g_regroup = v != 0; return v; }   /* coop_guest_host_pos */
+    if (!strcmp(op, "set") && !strcmp(name, "souls_keep")) {            /* see coop_souls_fix */
+        if (v == 1 || (v == 2 && g_keep_state == 3)) g_keep_state = (int)v;   /* 2 only after a count was remembered */
+        return v;
+    }
+    if (!strcmp(op, "get") && !strncmp(name, "env_", 4)) {                /* DEV: get env_X = the number in COOP_X */
+        const std::string e = std::string("COOP_") + (name + 4);
+        const char* x = getenv(e.c_str());
+        return x ? atof(x) : 0;
+    }
+    int i = 0;
+    while (i < n && strcmp(kv[i].name, name)) i++;
+    if (!strcmp(op, "set") && got == 3) {
+        if (i == n) { if (n == 128) return 0; strcpy(kv[n++].name, name); }
+        kv[i].v = v;
+        return v;
+    }
+    return i < n ? kv[i].v : 0;
 }
 
 /* IsLoggedIn (func_00568400) callers, once each */

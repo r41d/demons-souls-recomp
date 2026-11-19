@@ -273,7 +273,7 @@ diff -ruN a/recompiled/ppu_recomp_009.cpp b/recompiled/ppu_recomp_009.cpp
  } while(0)
  
  /* Each lifted function opens with PPU_MM_SNAP; its loads and stores use that
-@@ -38895,10 +38897,570 @@
+@@ -38895,10 +38897,587 @@
          ctx->lr = ctx->gpr[0];
          ctx->gpr[1] = ctx->gpr[1] + (int64_t)(0x90);
          return;
@@ -390,9 +390,22 @@ diff -ruN a/recompiled/ppu_recomp_009.cpp b/recompiled/ppu_recomp_009.cpp
 +extern "C" void coop_join_result(int rc);
 +extern "C" void coop_host_pos(int blk, const float* xyz);
 +extern "C" int coop_guest_host_pos(int* blk, float* xyz);
++extern "C" void coop_guest_blk(int blk);
++extern "C" int coop_souls_fix(int now);
++extern "C" unsigned coop_pad_inject(void);
 +static void des_coop_step(ppu_context* ctx) {
 +    PPU_MM_SNAP
 +    if (!coop_mode()) return;
++    /* every change of the player's souls, in the log next to the script lines (souls: see the boss rush block below) */
++    { static int32_t last = -1;
++      const uint32_t t8 = vm_read32((uint32_t)ctx->gpr[2] - 0x788C);
++      const uint32_t q1 = t8 ? vm_read32(t8 - 0x8000) : 0, q2 = q1 ? vm_read32(q1) : 0;
++      const uint32_t pd = q2 ? vm_read32(q2 + 0x8) : 0;
++      if (pd) { const int32_t now = (int32_t)vm_read32(pd + 0x78);
++        if (now != last) { if (last >= 0) fprintf(stderr, "[coop] souls %d -> %d\n", last, now); last = now; }
++        const int keep = coop_souls_fix(now);
++        if (keep >= 0) { vm_write32(pd + 0x78, (uint32_t)keep); last = keep;
++            fprintf(stderr, "[coop] souls put back: %d -> %d (the load on the way to the host)\n", now, keep); } } }
 +    /* Where the guest arrives. The summon reload puts a phantom at its sign's position; this join has no sign,
 +     * so the guest landed at the map's origin (0, y, 0), outside the level. The host leaves its position in the
 +     * mailbox; a guest that finds itself within 3 m of the origin while a join is under way is put next to it. */
@@ -400,12 +413,16 @@ diff -ruN a/recompiled/ppu_recomp_009.cpp b/recompiled/ppu_recomp_009.cpp
 +      if (des_player_where(ctx, &chr, &blk, xyz)) {
 +          if (coop_mode() == 1) coop_host_pos(blk, xyz);
 +          else { int hb = -1; float hp[3];
-+              if (xyz[0] * xyz[0] + xyz[2] * xyz[2] < 9.0f && coop_guest_host_pos(&hb, hp) &&
++              coop_guest_blk(blk);
++              const int got = coop_guest_host_pos(&hb, hp);       /* 1 arriving, 2 getting up after going down */
++              if (got && (got == 2 || xyz[0] * xyz[0] + xyz[2] * xyz[2] < 9.0f) &&
 +                  hp[0] * hp[0] + hp[2] * hp[2] >= 9.0f) {
 +                  hp[0] += 1.0f;
 +                  des_player_place(ctx, chr, hp);
 +                  fprintf(stderr, "[coop] guest placed at the host: %.2f %.2f %.2f, map %d,%d (was %.2f %.2f %.2f, map %d,%d)\n",
 +                          hp[0], hp[1], hp[2], (hb >> 8) & 0xFF, hb & 0xFF, xyz[0], xyz[1], xyz[2], (blk >> 8) & 0xFF, blk & 0xFF); } } } }
++    { const unsigned pad = coop_pad_inject();      /* the "has left" box: see ds_coop.cpp */
++      if (pad != ~0u) g_ps3_pad_inject = pad; }
 +    if (!coop_poll()) return;
 +    const uint32_t t = vm_read32((uint32_t)ctx->gpr[2] - 0x79AC);
 +    const uint32_t p = t ? vm_read32(t - 0x7F98) : 0;
@@ -2652,11 +2669,14 @@ diff -ruN a/recompiled/ppu_recomp_068.cpp b/recompiled/ppu_recomp_068.cpp
  } while(0)
  
  /* Each lifted function opens with PPU_MM_SNAP; its loads and stores use that
-@@ -14788,8 +14790,29 @@
+@@ -14788,8 +14790,41 @@
          return;
  }
  
 +extern "C" void br_lua_line(const char* line);   /* project/ds_boss_rush.cpp */
++extern "C" int coop_mode(void);                   /* project/ds_coop.cpp */
++extern "C" double coop_lua_query(const char* q);
++void func_00C9E5B0(ppu_context* ctx);             /* lua_pushnumber(L, f1) */
  void func_00C02C78(ppu_context* ctx) {
      PPU_MM_SNAP
 +    /* DES_LUA_PRINT=1 (PORT DEBUG): the game registers this as the scripts' print() and it
@@ -2666,7 +2686,11 @@ diff -ruN a/recompiled/ppu_recomp_068.cpp b/recompiled/ppu_recomp_068.cpp
 +     * run timer (project/ds_boss_rush.cpp). */
 +    { static int on = -1, br = -1; if (on < 0) on = getenv("DES_LUA_PRINT") ? 1 : 0;
 +      if (br < 0) { const char* e = getenv("DES_BOSS_RUSH"); br = e && *e && *e != '0'; }
-+      if (on || br) { const ppu_context save = *ctx; const uint32_t L = (uint32_t)ctx->gpr[3];
++      /* DES_COOP (co-op): print("COOPQ <question>") is the co-op script module asking the port something
++       * (project/ds_coop.cpp keeps what must live through a map load, which script globals and rolled-back event
++       * flags do not). The answer is a number, pushed with lua_pushnumber (0xC9E5B0), and print returns 1. */
++      static int co = -1; if (co < 0) co = coop_mode() ? 1 : 0;
++      if (on || br || co) { const ppu_context save = *ctx; const uint32_t L = (uint32_t)ctx->gpr[3];
 +        ctx->lr = 0x00C02C78; func_00C9E170(ctx); DRAIN_TRAMPOLINE(ctx);
 +        const int n = (int)(int32_t)ctx->gpr[3]; char line[600]; size_t k = 0;
 +        for (int i = 1; i <= n && i <= 8; i++) {
@@ -2678,7 +2702,12 @@ diff -ruN a/recompiled/ppu_recomp_068.cpp b/recompiled/ppu_recomp_068.cpp
 +          else for (uint32_t a = sp; k < sizeof line - 1; a++) { const char c = (char)vm_read8(a); if (!c) break; line[k++] = c; } }
 +        line[k] = 0; if (on) fprintf(stderr, "[lua] %s\n", line);
 +        if (br && !strncmp(line, "BRX ", 4)) br_lua_line(line + 4);
-+        *ctx = save; } }
++        *ctx = save;
++        if (co && !strncmp(line, "COOPQ ", 6)) {
++            ctx->fpr[1] = coop_lua_query(line + 6);
++            ctx->gpr[3] = L; ctx->lr = 0x00C02C78; func_00C9E5B0(ctx); DRAIN_TRAMPOLINE(ctx);
++            *ctx = save; ctx->gpr[3] = 1;
++            return; } } }
          uint64_t _cs_19 = ctx->gpr[19];
          uint64_t _cs_20 = ctx->gpr[20];
          uint64_t _cs_21 = ctx->gpr[21];

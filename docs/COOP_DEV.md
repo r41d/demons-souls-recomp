@@ -1,4 +1,10 @@
-# Co-op (work in progress, branch `coop`)
+# Co-op (EXPERIMENTAL, incomplete, branch `coop`)
+
+> **Status (2026-11-19): an experiment, not confirmed complete.** Nothing here is in a release, on `main`, or in
+> a launcher. It has only run as two copies of the game on one machine (macOS), against the local test server,
+> at 30 fps, mostly with scripted tests and one short play test by hand. Not tested: two machines, the internet,
+> Windows and Linux builds of the changed network code, 60 fps, most of the game's areas and bosses. Expect
+> things to break; the "known problems" below are the ones found so far, not all of them.
 
 The goal is co-op like the "seamless co-op" mods for the later Souls games: friends join your world without soul
 signs, stay through boss fights, and follow you between areas. It is built on the game's own white-phantom summon
@@ -104,16 +110,97 @@ wins. Run it with `COOP_GAME=game_coop` in front of the test runner.
   -> 5738 on the guest, the host (soul form in this save) came back to body form, no LEAVE_ROOM in psnr.log, and
   both still saw each other 70 s later. If the kill comes while the guest is still loading in, its picture was
   black at the end of that run (one run, not looked into).
-- **C. The kill in the guest's own save (designed, not built).** While in the host's world the guest's event flags
-  are the session's; every way home in the scripts calls `proxy:SetFlagInitState(2)`, which rolls them back (13
-  call sites, all Lua). Plan: when the guest first arrives, note which boss kill flags the host's world already
-  had (in spare event flags, which live through reloads inside the session); on the way home, read which kill
-  flags are set now and were not then, roll back as the game does, then set those in the guest's own state.
-  The boss table with each boss's kill flags is in tools/boss_rush/bossrush.lua (BR_B). Open: whether any way
-  home rolls back in native code, whether the demon's soul taken in the session stays in the inventory, what the
-  guest's save holds if the game is closed while still in the session.
-- Not looked at yet: following the host through an area change or a fog gate, the session lock BlockClear2 sets
-  (LockSession: it may refuse a new join after a boss), a guest dying, the host dying, black phantoms.
+- **C. The kill in the guest's own save (works).** While in the host's world the guest's event flags are the
+  session's, and the game's ways home roll them back (`proxy:SetFlagInitState(2)`, applied during the next map
+  load). Those ways home only fire for phantoms: OnIrregularLeaveSession_1 and OnRoomDisappeared return at once
+  for a live player, which the guest now is, so it would have stayed in a copy of the host's world. coop.lua's
+  COOP_GoHome is the guest's way home (hooked into both; the host going away arrives as OnRoomDisappeared): note
+  the boss kill flags set now that were not set when it arrived, roll back, SetSummonedPos / SetDefaultMapUid(-1)
+  / WarpNextStageKick as the game does; the first g_Initialize at home sets those flags before the map's scripts
+  read them.
+  - Nothing in the scripts lives through that load: globals are gone after every load, and no event flag
+    survives the rollback (tried 4131, 4999, 7999 ... 19999). So the notes are kept by the port:
+    `print("COOPQ set <name> <n>")` / `print("COOPQ get <name>")`, answered by coop_lua_query in ds_coop.cpp; the
+    scripts' print (func_00C02C78) pushes the answer with lua_pushnumber (func_00C9E5B0; lua_pushboolean is
+    func_00C9E5D0, lua_pushnil func_00C9E590) and returns 1. In memory only.
+  - Tested (`COOP_TEST_KILL=800:30 COOP_STOP_HOST_AT=160`, 250 s): arrival "bosses already dead in the host's
+    world: none"; Phalanx killed; the host stopped; guest: "goes home (the host's room is gone); bosses killed
+    together: 1", then at home "boss flag 4096 set in the guest's own world", at its old position, in body form
+    with the 5738 souls. Then the guest's copy started again alone from its own save: "boss flags: 4096".
+  - Open: a game closed while still in the session (the notes are in memory, and what that save holds is not
+    known); the guest's own form if no boss died (it goes home in body form either way now); the demon's soul
+    item; bosses with more flags than the kill flag (BR_B's clr lists); a guest that leaves by the menu.
+- **D. The guest follows the host to another map (works for a warp).** What happened without it: the host's
+  room disappears on its map change, and every join after that failed (OnFailedJoinSession on the guest, the host
+  re-creating its room each time, 37 rooms in a run). Two causes:
+  - A join only works with both players in the same map. The port now knows both (the guest's block from the
+    step hook, the host's from host_pos.txt, fresh for 4 s) and the guest does not try to join while they
+    differ. coop.lua asks `COOP_Get("follow")` from a check registered at every load on its own: 1 = the host is
+    in another map, and the guest goes there by itself (`proxy:WarpNextStage(area, block, 0, 0, point)`, point
+    999 for a world's first map, 998 - block otherwise: the archstone after that block's boss); then the join
+    brings it to the host as before.
+  - The summon only takes a player in soul form: after the first session the guest is a live player (step A),
+    and the join failed even in the same map. A guest on its own between two of the host's maps is put back in
+    soul form (COOP_Joinable); arriving makes it a live player again. At home it gets the form it had before
+    the first join, or body form if a boss died.
+  - OnRoomDisappeared therefore no longer sends the guest home at once: it notes the bosses killed together so
+    far, waits, follows; `follow` = 2 (no fresh host position for a minute) sends it home with the credit.
+  - A summoned player is a white phantom at InGameStart whether or not IsClient() is true yet (it was false in
+    one run, and the "alone" branch then broke the session): arrival is IsWhiteGhost(), alone is "not white and
+    not in a party".
+  - Tested with `COOP_ENV_A="DES_WARP_AT=125:3,1,999"` (the host warps from 1-1 to the Shrine of Storms with
+    the guest in its party): "following the host to map 3,1, point 999", one join, no failed join, both screens
+    show both players in the Shrine. The boss test (kill, host stops) still ends with the flag in the guest's
+    world, now after the one-minute wait, and "home after a boss: body form".
+  - Known problems: (1) the guest's screen showed "Host1 has left." (event text 20001020), a box that waits
+    for OK, at every host map change. It is not opened by the scripts (OnLeavePlayer and LeaveMessage never run;
+    the id is not built as a constant anywhere in the lifted code either) and `proxy:CloseMenu()` leaves it up
+    although IsShowMenu_InfoMenu() sees it. Worked around: while the guest waits for the host, and at 1 / 3 / 6 /
+    10 s after it arrives, an info box on screen makes the port press OK (coop.lua COOP_CloseLeaveBox ->
+    `COOP_Set("press_ok", 1)` -> coop_pad_inject holds CROSS for 6 steps through g_ps3_pad_inject). In the follow
+    test it pressed three times while waiting and the box was gone on arrival. Any other info box that happens
+    to be open at those moments gets the same press.
+    (2) The guest's
+    souls went up at the load it makes by itself on the way to the host (4102 -> 6361 or 8611; the step hook
+    now logs every change, "[coop] souls a -> b"): once, natively, between the map's Second_Initialize and
+    g_second_Initialize, with no script of ours in between, with or without the switch to soul form and with or
+    without ResetSummonParam. g_Initialize's `proxy:AddBlockClearBonus()` ("souls not obtained yet") is the
+    suspect; the cause is not known. Worked around: coop.lua says `souls_keep` 1 before that warp and 2 at the
+    next InGameStart, and the step hook puts the count back ("[coop] souls put back: 6361 -> 4102",
+    coop_souls_fix in ds_coop.cpp). The real rewards are untouched: with Phalanx killed the guest's log reads
+    4102 -> 4786 -> 5738 and the host's 4102 -> 5432 -> 6384, and going home adds nothing.
+    (3) The guest goes to the host's map in its own world first:
+    with the boss of that block alive in its world, the archstone point is inside the arena for the seconds
+    until the join. (4) Walking into another block of the same world, a fog gate and the Nexus are not tested.
+- **A guest that dies** (first seen in the user's own play test, then with `COOP_ENV_B="COOP_TEST_DIE=25"` and
+  `COOP_GOD=0`): the game's death handling runs (OnEvent_4000, souls 4102 -> 0), the guest drops out of the
+  session, and the follow logic brings it back by itself about 5 s later, beside the host, in body form. The host
+  got "Guest1 has left." each time; it now has a watch of its own (COOP_HostWatch, registered at every load):
+  for a few seconds after its party empties, an info box gets the same OK press. Checked: no box on the host
+  after the guest's death and return.
+- **The guest stays in the session when it goes down** (coop.lua step E). The drop was the death's own map load
+  (SoloPlayDeath_2: WarpNextStageKick), and a map load takes a client out of the session. Tried first: no load,
+  and the dead guest brought back in place (SetAlive, SetHp, RequestFullRecover, animation 6100). The session
+  held and IsAlive was true again, but the character could not move any more (a walk scripted with
+  PAD_STICK_SEQ and logged with DES_WHERE=2: 5 m before the death, 0 m after). What works is not dying: an
+  arriving guest is put in the game's own dead mode (`SetDeadMode(10000, true)`, the tutorial's: health stops
+  at 1), a check every few steps (`GetHpRate(10000) <= 0.004`; `OnCharacterHP(.., 0.0)` never ran) starts
+  COOP_GuestDown: "YOU DIED", DisableMove + EnableInvincible for 4 s (`COOP_DOWN_SECS` in the copy's
+  environment changes it), then `set regroup 1` (the step hook puts the guest next to the host:
+  coop_guest_host_pos returns 2), full health, the stand-up animation, and the check again. Tested with
+  `COOP_GOD=0 COOP_ENV_B="COOP_TEST_DIE=25 DES_WHERE=2 PAD_STICK_SEQ=..."` (the test sets the health to 0, as
+  damage does): down at 15.9, 67.9, 89.2, held there through a scripted walk, up at the host's 11.9, 67.9, 86.7
+  with a full bar, walking again afterwards (to 17.3), souls 4102 throughout, and no LEAVE_ROOM / JOIN_ROOM in
+  psnr.log after the first join. Not tested: real damage from an enemy, a fall (a kill plane may get past dead
+  mode: then it is the game's death as before, out and back in; `COOP_TEST_FORCE=1` tests that path), the guest
+  going down in a boss fight. The guest loses nothing when it goes down: no souls, no body form. That is a
+  choice, not a limit (there is no bloodstain it could go back to).
+- **The host dies** (`COOP_ENV_A="COOP_TEST_DIE=160"`): the game's own death, with its reload. The guest gets
+  HostDead, the room is made again, and the follow logic brings the guest back by itself; in the one test it
+  took two rounds (rooms 5 -> 6 -> 7 in psnr.log, about 10 s) and the host's OK press ran 14 times in between.
+  At the end both stood at the archstone, the host in soul form with 0 souls, the guest with its 4102.
+- Not looked at yet: the session lock BlockClear2 sets (LockSession: it may refuse a new join after a boss),
+  black phantoms, a guest in body form joining for the first time.
 
 ## Next steps
 

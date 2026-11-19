@@ -20,6 +20,8 @@ BIN=$ROOT/port/build_mac/DemonsSoulsRecomp
 WIN=$ROOT/port/build_mac/DemonsSoulsRecomp_window
 # COOP_GAME=game_coop runs the copy tools/make_coop.py builds (the co-op script module); the default is game/.
 ELF=$ROOT/${COOP_GAME:-game}/PS3_GAME/USRDIR/EBOOT.elf
+# COOP_ENV_A / COOP_ENV_B="NAME=value NAME=value" are settings for the host copy / the guest copy only.
+# COOP_STOP_HOST_AT=<seconds> stops the host copy then (the guest's way home), with a fixed run length.
 # COOP_TEST_KILL=<character id>:<seconds> builds it with make_coop.py's --test-kill (Phalanx is 800).
 if [ "${COOP_GAME:-}" = game_coop ]; then
   "$ROOT/.venv/bin/python" "$ROOT/tools/make_coop.py" ${COOP_TEST_KILL:+--test-kill} ${COOP_TEST_KILL:-} || exit 1
@@ -39,7 +41,7 @@ PAD_B=${COOP_PAD_SCRIPT_B:-$PAD_A}
 PIDS=()
 if [ -n "${COOP_PLAY:-}" ]; then IN_A=controller; IN_B=keyboard; MUTE_A=0; GOD=0; SIZE=1280x720
 else IN_A=controller; IN_B=controller; MUTE_A=1; GOD=1; SIZE=960x540; fi
-start_copy() {   # name mode np-name p2p-port pad-script input-mode mute
+start_copy() {   # name mode np-name p2p-port pad-script input-mode mute "NAME=value ..."
   local T=$WORK/$1
   mkdir -p "$T"/{logs,hdd0,hdd1,no_flash}
   if [ -n "$SAVE" ] && [ ! -d "$T/gamedata" ]; then cp -R "$SAVE" "$T/gamedata"; fi
@@ -59,16 +61,24 @@ start_copy() {   # name mode np-name p2p-port pad-script input-mode mute
     export PS3RECOMP_FFMPEG_AVCODEC=$(ls /opt/homebrew/lib/libavcodec.[0-9]*.dylib 2>/dev/null | grep -E 'libavcodec\.[0-9]+\.dylib$' | head -n 1)
     export PS3RECOMP_FFMPEG_AVUTIL=$(ls /opt/homebrew/lib/libavutil.[0-9]*.dylib 2>/dev/null | grep -E 'libavutil\.[0-9]+\.dylib$' | head -n 1)
     mkdir -p "$PS3RECOMP_MSL_CACHE"
+    for kv in ${=8}; do export "$kv"; done      # this copy's own settings (COOP_ENV_A / COOP_ENV_B)
     [ -n "${COOP_FRAME_DUMP:-}" ] && export PS3RECOMP_METAL_FRAME_DUMP="$T/frame.ppm"   # the last frame shown, every 120 frames
     exec "$WIN" --title "Demon's Souls - CO-OP TEST $2" --size $SIZE -- "$BIN" "$ELF" >"$T/logs/out.txt" 2>"$T/logs/err.txt"
   ) &
   PIDS+=($!)
   echo "$2 copy pid $! in $T"
 }
-[ "$WHO" != guest ] && start_copy A host Host1 3658 "$PAD_A" $IN_A $MUTE_A
+[ "$WHO" != guest ] && start_copy A host Host1 3658 "$PAD_A" $IN_A $MUTE_A "${COOP_ENV_A:-}"
 [ "$WHO" = both ] && sleep 20
-[ "$WHO" != host ] && start_copy B guest Guest1 3659 "$PAD_B" $IN_B 1
-if [ "$SECS" = 0 ]; then
+[ "$WHO" != host ] && start_copy B guest Guest1 3659 "$PAD_B" $IN_B 1 "${COOP_ENV_B:-}"
+if [ -n "${COOP_STOP_HOST_AT:-}" ] && [ "$SECS" != 0 ]; then    # DEV TEST: the host goes away, the guest plays on
+  caffeinate -dims -t $SECS &
+  sleep $COOP_STOP_HOST_AT
+  kill $PIDS[1] 2>/dev/null && echo "stopped the host (pid $PIDS[1]) at $COOP_STOP_HOST_AT s"
+  sleep $(( SECS - COOP_STOP_HOST_AT ))
+  for p in $PIDS; do kill $p 2>/dev/null && echo "stopped pid $p"; done
+  wait $PIDS 2>/dev/null
+elif [ "$SECS" = 0 ]; then
   echo "running until both game windows are closed"
   caffeinate -dims -w $PIDS[1] &
   wait $PIDS 2>/dev/null
