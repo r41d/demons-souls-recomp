@@ -1,4 +1,4 @@
-"""Extract files from a PS3 disc image of Demon's Souls (BLUS-30443).
+"""Extract files from a PS3 disc image of Demon's Souls (USA BLUS-30443 or Europe BLES-00932).
 
 The image can be a plain .iso or a .zip holding one (a Redump set, read straight out of the zip
 without unpacking it). Redump images keep the disc's encryption: the sectors outside the plain
@@ -10,7 +10,8 @@ usage: python tools/iso_extract.py <image.iso|image.zip> <out_dir> [--key HEX] (
 import os, struct, sys, zipfile
 
 SECT = 2048
-HEAD = 17632            # plain region 0 of this disc: both filesystems' metadata
+HEAD = 17632            # plain region 0 of the US disc (both filesystems' metadata); each image's own comes
+                        # from its sector 0 (head()): the EU disc's is 17856
 
 
 def open_image(path):
@@ -68,10 +69,40 @@ def iso9660_files(meta):
     return files
 
 
+META_CAP = 32768        # sectors (64 MB): more than either disc's metadata (US 17632, EU 17856)
+
+
+def head(s0):
+    """Sectors to read as metadata: plain region 0 (both filesystems' metadata) from the image's sector 0. A
+    decrypted image rebuilt from a folder dump may have no region table, or one plain region spanning the whole
+    disc (makeps3iso): then META_CAP -- the rest of such an image is plain and is streamed like any other file,
+    never read into memory at once."""
+    n = struct.unpack('>I', s0[0:4])[0]
+    return min(regions(s0)[0][1] + 1, META_CAP) if 0 < n < 256 else META_CAP
+
+
+def read_meta(f):
+    """Reads plain region 0 from the start of an image stream: (metadata bytes, its size in sectors)."""
+    s0 = f.read(SECT)
+    h = head(s0)
+    return s0 + f.read((h - 1) * SECT), h
+
+
+def title_id(path):
+    """The disc's TITLE_ID (PS3_GAME/PARAM.SFO), read from the plain metadata region; None if not there."""
+    meta, h = read_meta(open_image(path))
+    e = iso9660_files(meta).get('/PS3_GAME/PARAM.SFO')
+    if not e or e[0] >= h:
+        return None
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'setup'))
+    import region
+    return region.sfo_title_id(meta[e[0] * SECT:e[0] * SECT + e[1]])
+
+
 def probe(path):
     """(needs_key, check) -- check(key) is True when that key decrypts EBOOT.BIN to a SELF."""
     f = open_image(path)
-    meta = f.read(HEAD * SECT)
+    meta, HEAD = read_meta(f)
     files = iso9660_files(meta)
     if '/PS3_GAME/USRDIR/EBOOT.BIN' not in files:
         sys.exit(f'{path}: no PS3_GAME/USRDIR/EBOOT.BIN -- not a PS3 game disc image?')
@@ -90,7 +121,7 @@ def probe(path):
 
 def extract(path, out_dir, wanted, key=None):
     f = open_image(path)
-    meta = f.read(HEAD * SECT)
+    meta, HEAD = read_meta(f)
     plain = regions(meta)
     is_plain = lambda l: key is None or any(a <= l <= b for a, b in plain)
     files = iso9660_files(meta)

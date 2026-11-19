@@ -128,7 +128,7 @@ for s in $steps; do
         fail "could not get the decryption keys (they are downloaded once from RPCS3's source on GitHub). Check the internet connection and run this again."
       rm -f "$DES_ELF.partial"
       "$VPY" "$DES_ROOT/tools/decrypt_self.py" "$DES_USRDIR/EBOOT.BIN" -o "$DES_ELF.partial" --keys "$keys" ||
-        { rm -f "$DES_ELF.partial"; fail "could not decrypt game/PS3_GAME/USRDIR/EBOOT.BIN (is it Demon's Souls, BLUS-30443?)"; }
+        { rm -f "$DES_ELF.partial"; fail "could not decrypt game/PS3_GAME/USRDIR/EBOOT.BIN (is it Demon's Souls, BLUS-30443 or BLES-00932?)"; }
       mv "$DES_ELF.partial" "$DES_ELF"
     fi
     "$VPY" "$DES_ROOT/mac/setup_steps.py" check-elf ${DES_ANY_EBOOT:+--any} ;;

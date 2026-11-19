@@ -32,7 +32,7 @@ BUILD = os.path.join(ROOT, 'port', 'build_opt')
 # patches/: a folder updated (git pull, a new ZIP) but not rebuilt -- or whose rebuild failed or was
 # stopped -- would run the old exe with the new files (GitHub #4: a black screen at the title).
 BUILT = os.path.join(BUILD, 'built')
-PATCHES = ('ps3recomp-local.patch', 'lifted-code.patch')
+PATCHES = ('ps3recomp-local.patch', 'lifted-code.patch', 'lifted-code-eu.patch')   # both releases' code edits
 MIN_CLANG = 17
 EXE = '.exe' if os.name == 'nt' else ''
 XWIN_DIR = os.environ.get('DS_XWIN_DIR') or os.path.join(ROOT, 'deps', 'xwin')

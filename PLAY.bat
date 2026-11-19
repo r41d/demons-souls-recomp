@@ -264,7 +264,7 @@ exit /b 1
 rem STALE=1 when patches\ differs from what the last successful build used (see :play above).
 :stale
 set "STALE="
-for %%P in (ps3recomp-local.patch lifted-code.patch) do (
+for %%P in (ps3recomp-local.patch lifted-code.patch lifted-code-eu.patch) do (
   if not exist "%D%\port\build_opt\built\%%P" set "STALE=1"
   fc /b "%D%\patches\%%P" "%D%\port\build_opt\built\%%P" >nul 2>&1 || set "STALE=1"
 )

@@ -14,7 +14,7 @@ import hashlib, os, subprocess
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PORT = os.path.join(ROOT, 'port')
 PS3RECOMP = os.path.join(ROOT, 'deps', 'ps3recomp')
-LIFTED_PATCH = os.path.join(ROOT, 'patches', 'lifted-code.patch')
+LIFTED_PATCH = os.path.join(ROOT, 'patches', 'lifted-code.patch')   # setup.py sets the release's (Europe: -eu)
 RUNTIME_PATCH = os.path.join(ROOT, 'patches', 'ps3recomp-local.patch')
 # ps3recomp's commit stores seven files with mixed CRLF / LF endings and the runtime patch is LF.
 # Git for Windows (core.autocrlf=true) compares them without the CRs; stock git elsewhere compares
@@ -188,7 +188,8 @@ def sync_lifted(inputs):
         return 'relift'
     if text == lifted_mark_text(new, inputs):
         return 'current'
-    say('  patches/lifted-code.patch changed since it was applied: updating the recompiled code')
+    rel = 'patches/' + os.path.basename(LIFTED_PATCH)
+    say(f'  {rel} changed since it was applied: updating the recompiled code')
     saved = os.path.join(PORT, '.lifted.patch')
     tmp = os.path.join(PORT, '.lifted.old.patch')
     try:
@@ -197,7 +198,7 @@ def sync_lifted(inputs):
             return _apply(PORT, tmp, '-R', '--check').returncode == 0
         old = _pick([_read(saved)], reverses) if os.path.isfile(saved) else None
         if old is None:
-            old = _pick(_history('patches/lifted-code.patch'), reverses)
+            old = _pick(_history(rel), reverses)
         if old is not None:
             _write(tmp, old)
             paths = _paths(old) | _paths(new)

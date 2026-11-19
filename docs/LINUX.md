@@ -19,8 +19,9 @@ Vulkan renderer and no Proton (faster on the Steam Deck): see [LINUX_NATIVE.md](
 ## What you need
 
 - A Linux PC (x86-64) with a Vulkan GPU driver, or a Steam Deck (in desktop mode for the setup).
-- Your Demon's Souls disc image (USA, **BLUS-30443**): `.iso`, Redump `.zip`, or a dumped disc folder,
-  plus its disc key if it is encrypted (as Redump images are).
+- Your Demon's Souls disc image (USA **BLUS-30443** or Europe **BLES-00932**): `.iso`, Redump `.zip`, or a
+  dumped disc folder, plus its disc key if it is encrypted (as Redump images are). The European game's
+  language follows `PS3_LANG` (`fr`, `de`, `es`, `it`; English otherwise), e.g. `PS3_LANG=fr linux/play.sh`.
 - About **25 GB free** (8 GB game files, 1-2 GB tools and SDK, the rest build files) and time: the first
   build takes 10-30 minutes on a desktop (6 minutes on a 16-core one), probably **1-2 hours on a
   Steam Deck**.
