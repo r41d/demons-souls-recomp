@@ -1,4 +1,5 @@
-"""Keyboard / mouse button icons for the game's PS3 button atlases (docs/NOTES.md fix 91).
+"""Keyboard / mouse button icons for the game's PS3 button atlases (docs/NOTES.md fix 91), and the Xbox pad's
+(fix 163: --xbox, or with the default folders both; textures\\xbox).
 
 The runtime draws a file from textures\\kbm instead of a texture while the keyboard / mouse is what was used
 last, and the PS3 art again once the pad is (rsx_tex_pack.c). This makes those files from YOUR copy of the
@@ -392,11 +393,139 @@ def cells():
     return {'DSFont24_1000': font, 'Menu00': menu00, 'Menu08': menu08}
 
 
+# ---- Xbox controller icons (docs/NOTES.md fix 163): the same cells drawn as the Xbox pad's buttons. The runtime shows
+# them from textures/xbox while an Xbox-style pad (on Windows every XInput pad) is what was used last.
+XBOX_VERSION = 1
+XBOX_FACE = {'A': (96, 176, 72), 'B': (210, 64, 52), 'X': (66, 122, 214), 'Y': (232, 190, 52)}
+
+
+def round_button(w, h, rim=True):
+    """A dark round button (SS-scaled), like the game's face-button glyphs."""
+    W, H = w * SS, h * SS
+    im = Image.new('RGBA', (W, H), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    r = min(W, H) / 2 - SS * 0.8
+    cx, cy = W / 2, H / 2
+    grad = Image.new('RGBA', (W, H))
+    gd = ImageDraw.Draw(grad)
+    for y in range(H):
+        t = y / max(1, H - 1)
+        gd.line((0, y, W, y), fill=tuple(int(PLATE_TOP[i] * (1 - t) + PLATE_BOT[i] * t) for i in range(3)) + (255,))
+    m = Image.new('L', (W, H), 0)
+    ImageDraw.Draw(m).ellipse((cx - r, cy - r, cx + r, cy + r), fill=255)
+    im.paste(grad, (0, 0), m)
+    if rim:
+        d.ellipse((cx - r, cy - r, cx + r, cy + r), outline=(120, 120, 126, 255), width=max(1, SS // 2))
+        d.ellipse((cx - r - SS * 0.7, cy - r - SS * 0.7, cx + r + SS * 0.7, cy + r + SS * 0.7), outline=(0, 0, 0, 200),
+                  width=max(1, SS // 2))
+    return im
+
+
+def colored_label(base_ss, s, col, frac=0.58):
+    """A game-font label in a colour, centred, with a dark shadow (SS-scaled base)."""
+    W, H = base_ss.size
+    lab = tint(text_img(s), col)
+    sc = min(H * frac / lab.height, W * 0.70 / lab.width)
+    L = lab.resize((max(1, int(lab.width * sc)), max(1, int(lab.height * sc))), Image.LANCZOS)
+    shadow = Image.new('RGBA', L.size, (0, 0, 0, 0))
+    shadow.putalpha(L.getchannel('A'))
+    x, y = (W - L.width) // 2, (H - L.height) // 2
+    base_ss.alpha_composite(shadow, (x + SS // 2, y + SS // 2))
+    base_ss.alpha_composite(L, (x, y))
+    return base_ss
+
+
+def face(letter):
+    """A B X Y: the letter in its Xbox colour on a dark round button."""
+    return lambda w, h: down(colored_label(round_button(w, h), letter, XBOX_FACE[letter]), w, h)
+
+
+def stick_click(s):
+    """LS / RS: a ring (the stick) with the label."""
+    def f(w, h):
+        im = round_button(w, h)
+        W, H = im.size
+        r = min(W, H) / 2 - SS * 3.2
+        ImageDraw.Draw(im).ellipse((W / 2 - r, H / 2 - r, W / 2 + r, H / 2 + r), outline=CREAM + (255,),
+                                   width=max(2, SS))
+        return down(colored_label(im, s, CREAM, 0.40), w, h)
+    return f
+
+
+def menu_button(kind, wide_text=None):
+    """Menu (three lines) / View (two overlapping squares) on a key plate; wide cells add the word."""
+    def f(w, h):
+        p = plate(w, h)
+        d = ImageDraw.Draw(p)
+        W, H = p.size
+        c = CREAM + (255,)
+        lw = max(2, int(H * 0.07))
+        side = H * 0.46
+        x0 = (W - side) / 2 if not wide_text else W * 0.08
+        y0 = (H - side) / 2
+        if kind == 'menu':
+            for k in range(3):
+                y = y0 + side * (0.16 + 0.34 * k)
+                d.line((x0, y, x0 + side, y), fill=c, width=lw)
+        else:
+            s2 = side * 0.68
+            d.rounded_rectangle((x0 + side - s2, y0, x0 + side, y0 + s2), int(lw), outline=c, width=lw)
+            d.rounded_rectangle((x0, y0 + side - s2, x0 + s2, y0 + side), int(lw), outline=c, width=lw,
+                                fill=PLATE_BOT + (255,))
+        if wide_text:
+            lab = tint(text_img(wide_text), CREAM)
+            sc = H * 0.50 / lab.height
+            L = lab.resize((max(1, int(lab.width * sc)), max(1, int(lab.height * sc))), Image.LANCZOS)
+            p.alpha_composite(L, (int(x0 + side + W * 0.06), int((H - L.height) / 2)))
+        return down(p, w, h)
+    return f
+
+
+def xbox_cells():
+    """(box, icon maker) per atlas for the Xbox pad: what each PS3 button is on an Xbox pad (the d-pad and stick
+    pictures stay the game's own)."""
+    font = [((0, 0, 26, 26), face('Y')),                      # triangle
+            ((26, 0, 52, 26), face('X')),                     # square
+            ((52, 0, 78, 26), face('B')),                     # circle
+            ((78, 0, 104, 26), face('A')),                    # cross
+            ((156, 0, 182, 26), kc('RB', 0.46)),             # R1
+            ((182, 0, 208, 26), kc('RT', 0.46)),             # R2
+            ((208, 0, 234, 26), kc('LB', 0.46)),             # L1
+            ((234, 0, 260, 26), kc('LT', 0.46)),             # L2
+            ((260, 0, 286, 26), stick_click('RS')),          # R3
+            ((286, 0, 312, 26), stick_click('LS')),          # L3
+            ((0, 52, 112, 78), menu_button('view', 'View')),  # wide SELECT
+            ((112, 52, 208, 78), menu_button('menu', 'Menu')),  # wide START
+            ((130, 0, 156, 26), menu_button('view')),        # small SELECT
+            ((390, 0, 416, 26), menu_button('menu'))]        # small START
+    menu00 = [((160, 0, 192, 32), menu_plate_icon(face('X'))),
+              ((192, 0, 224, 32), menu_plate_icon(face('Y'))),
+              ((160, 32, 192, 64), menu_plate_icon(face('B'))),
+              ((192, 32, 224, 64), menu_plate_icon(face('A'))),
+              ((256, 0, 288, 32), lambda w, h: key_icon(w, h, 'LB', 0.46)),             # L1
+              ((256, 32, 288, 64), lambda w, h: key_icon(w, h, 'RB', 0.46)),            # R1
+              ((288, 0, 320, 32), emboss('LT')), ((320, 0, 352, 32), emboss('LT')),    # L2
+              ((288, 32, 320, 64), emboss('RT')), ((320, 32, 352, 64), emboss('RT'))]  # R2
+    menu08 = [((79, 404, 98, 423), lambda w, h: key_icon(w, h, 'LB', 0.5)),   # FE_key_L (L1)
+              ((102, 404, 121, 423), lambda w, h: key_icon(w, h, 'RB', 0.5)),  # FE_key_R (R1)
+              ((79, 426, 98, 445), menu_plate_icon(face('X')))]               # FE_key_Square
+    return {'DSFont24_1000': font, 'Menu00': menu00, 'Menu08': menu08}
+
+
 # (file, texture, the runtime's texture-pack KEY of it as the game draws it, first 16 hex digits of the sha1 of
 # the decoded original = the BLUS-30443 English disc's, cells). Another disc's atlas has another KEY: skipped.
 JOBS = [(r'FONT\NA_ENGLISH\dsfont24.tpf', 'DSFont24_1000', 'CE4F0427E62376F5', '41ac2ad63b6a6e53'),
         (r'MENU\menu.tpf', 'Menu00', '073A392EE5388F44', '9209bebf1b636346'),
         (r'MENU\menu.tpf', 'Menu08', '0740A345421ED259', '0eec764f7e387a26')]
+
+
+def xbox_up_to_date(out):
+    """The Xbox icons in out are from this XBOX_VERSION."""
+    try:
+        with open(os.path.join(out, 'version.txt')) as f:
+            return f.read().strip() == str(XBOX_VERSION)
+    except OSError:
+        return False
 
 
 def up_to_date(out, keys=None):
@@ -412,15 +541,16 @@ def up_to_date(out, keys=None):
     return v == str(VERSION) and k == signature(keys)
 
 
-def make(usrdir, out, preview=False, keys=None):
+def make(usrdir, out, preview=False, keys=None, xbox=False):
     """-> how many atlases were written to out (<KEY>_kbm_<name>.png each), plus out\\version.txt and keys.txt
-    (the bindings drawn; keys: action -> [key, key], default read_bindings())."""
+    (the bindings drawn; keys: action -> [key, key], default read_bindings()). xbox: the Xbox pad's icons instead
+    (<KEY>_xbox_<name>.png, fix 163; no keys.txt, they do not depend on the bindings)."""
     global U
     U = usrdir
     KEYS.clear()
     KEYS.update(keys or read_bindings())
     load_font()
-    table = cells()
+    table = xbox_cells() if xbox else cells()
     os.makedirs(out, exist_ok=True)
     prev, n = [], 0
     for tpf, name, key, sha in JOBS:
@@ -434,16 +564,17 @@ def make(usrdir, out, preview=False, keys=None):
             w, h = x1 - x0, y1 - y0
             im.paste(Image.new('RGBA', (w, h), (0, 0, 0, 0)), (x0, y0))
             im.alpha_composite(mk(w, h), (x0, y0))
-        im.save(os.path.join(out, '%s_kbm_%s.png' % (key, name)))
+        im.save(os.path.join(out, '%s_%s_%s.png' % (key, 'xbox' if xbox else 'kbm', name)))
         n += 1
         if preview:
             xs = [c[0] for c in cl]
             bx = (min(b[0] for b in xs), min(b[1] for b in xs), max(b[2] for b in xs), max(b[3] for b in xs))
             prev.append((orig.crop(bx), im.crop(bx)))
     with open(os.path.join(out, 'version.txt'), 'w') as f:
-        f.write(f'{VERSION}\n')
-    with open(os.path.join(out, 'keys.txt'), 'w') as f:
-        f.write(signature(KEYS) + '\n')
+        f.write(f'{XBOX_VERSION if xbox else VERSION}\n')
+    if not xbox:
+        with open(os.path.join(out, 'keys.txt'), 'w') as f:
+            f.write(signature(KEYS) + '\n')
     if prev:
         Z, rows = 4, []
         for a, b in prev:
@@ -461,9 +592,21 @@ def make(usrdir, out, preview=False, keys=None):
 if __name__ == '__main__':
     a = [x for x in sys.argv[1:] if not x.startswith('--')]
     usr = a[0] if a else U
+    if '--xbox' in sys.argv:   # only the Xbox icons (fix 163)
+        out = a[1] if len(a) > 1 else os.path.join(ROOT, 'textures', 'xbox')
+        if '--if-stale' in sys.argv and xbox_up_to_date(out):
+            sys.exit(0)
+        n = make(usr, out, '--preview' in sys.argv, xbox=True)
+        print(f'  {n} Xbox controller button atlases in {out}')
+        sys.exit(0 if n else 1)
     out = a[1] if len(a) > 1 else os.path.join(ROOT, 'textures', 'kbm')
-    if '--if-stale' in sys.argv and up_to_date(out):
-        sys.exit(0)
-    n = make(usr, out, '--preview' in sys.argv)
-    print(f'  {n} keyboard / mouse button atlases in {out}')
-    sys.exit(0 if n else 1)
+    n = -1
+    if not ('--if-stale' in sys.argv and up_to_date(out)):
+        n = make(usr, out, '--preview' in sys.argv)
+        print(f'  {n} keyboard / mouse button atlases in {out}')
+    if len(a) <= 1:   # the default folders: the Xbox icons too, when they are missing or old (fix 163)
+        xo = os.path.join(ROOT, 'textures', 'xbox')
+        if not ('--if-stale' in sys.argv and xbox_up_to_date(xo)):
+            m = make(usr, xo, '--preview' in sys.argv, xbox=True)
+            print(f'  {m} Xbox controller button atlases in {xo}')
+    sys.exit(0 if n != 0 else 1)

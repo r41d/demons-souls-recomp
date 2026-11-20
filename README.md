@@ -231,7 +231,8 @@ Keyboard + mouse work alongside a controller; whichever you touch last takes ove
   scrolls, and side buttons or PageUp / PageDown are L1 / R1. `DES_POINT=0` turns pointing off;
   `PAD_MENU_MOUSE=0` turns the mouse off in menus.
 - **Button icons** show keys or PS3 buttons depending on what you used last (`LD_TEX_KBM=0` = always PS3,
-  `1` = always keyboard).
+  `1` = always keyboard). On Windows a controller gets Xbox buttons (A B X Y, LB RB LT RT), unless a
+  PlayStation controller is connected; `LD_TEX_PAD=ps3` keeps the PS3 buttons, `LD_TEX_PAD=xbox` always uses Xbox.
 - **Mouse look** follows the game's invert options. `PAD_MOUSE_LOOK_SENS=0.0012` sets the sensitivity;
   `PAD_MOUSE_LOOK=0` restores the old stick-style mouse.
 - **Keys go by position**, so AZERTY uses ZQSD. `PAD_KEYS_BY_LETTER=1` = by letter.

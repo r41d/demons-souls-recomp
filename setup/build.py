@@ -761,10 +761,13 @@ def kbm_icons():
                            check=True, stdin=subprocess.DEVNULL)
         sys.path.insert(0, os.path.join(ROOT, 'tools'))
         import kbm_icons as k
-        if k.up_to_date(out):
-            return
-        n = k.make(usr, out)
-        say(f'  keyboard / mouse button icons: {n} of 3 made in {out}')
+        if not k.up_to_date(out):
+            n = k.make(usr, out)
+            say(f'  keyboard / mouse button icons: {n} of 3 made in {out}')
+        xo = os.path.join(ROOT, 'textures', 'xbox')   # the Xbox pad's icons (fix 163), shown while one is used
+        if not k.xbox_up_to_date(xo):
+            n = k.make(usr, xo, xbox=True)
+            say(f'  Xbox controller button icons: {n} of 3 made in {xo}')
     except Exception as e:   # noqa: BLE001 -- an optional extra
         say(f'  keyboard / mouse button icons not made ({e}); the game shows the PS3 buttons')
 

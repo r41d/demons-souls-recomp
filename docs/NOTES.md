@@ -4150,6 +4150,33 @@ Don't run ps3recomp tools with `-P`/`-I`: they import sibling modules from their
       helpers tested headless. Not checked: either window opened (no Windows or display here), a real install from
       a launcher, the macOS launcher (not changed; it can call the same script).
 
+163. **Xbox controller button icons on Windows (2026-11-20, RTX 3070 PC, Linux, user request):**
+    - tools/kbm_icons.py --xbox (and with no folder arguments, as build.py and the launcher call it, both sets)
+      draws the same three atlases fix 91 does (DSFont24_1000, Menu00, Menu08) as the Xbox pad: Y X B A in their
+      colours on round buttons for triangle / square / circle / cross, LB RB LT RT for L1 R1 L2 R2, LS / RS for
+      L3 / R3, View / Menu for SELECT / START; the d-pad and stick pictures stay the game's. Into
+      textures\xbox\<KEY>_xbox_<name>.png with their own version.txt (XBOX_VERSION); no keys.txt, they do not
+      depend on the bindings. setup/build.py makes them after a build; the launcher's --if-stale run before Play
+      makes them when missing.
+    - rsx_tex_pack.c scans <dir>\xbox after kbm\ under its own salt; texpack_icon_set() says which set to draw:
+      keyboard / mouse while it is what was used last (fix 91 unchanged), else Xbox when there are Xbox files, the
+      pad is what was used last (also with LD_TEX_KBM=0: a keyboard player keeps the PS3 art) and
+      the pad is an Xbox-style pad, else the game's own. rsx_live_draw.c keeps both replacement indices per
+      cached texture (kbm_idx, xbox_idx) and switches the bound texture when the wanted set changes.
+    - ps3_host_pad_is_xbox (cellPad.c, XInput builds): every XInput pad has the Xbox layout, but DS4Windows and
+      Steam Input show a DualShock as one, so while a Sony game controller (HID vendor 054C, usage game pad /
+      joystick) is on the raw input device list the PS3 icons stay. Checked every 2 s; logs "[pad] ... button
+      icons" when it changes. Native Linux / macOS (SDL) builds: no Xbox icons yet (stubs).
+    - LD_TEX_PAD=ps3 never shows them, LD_TEX_PAD=xbox always for the pad; LD_TEX_XBOX_DIR=<folder> instead of
+      textures\xbox.
+    - With the Arabic translation installed Menu08 has another KEY (the HUD's L / R are redrawn), so its Xbox
+      (and keyboard) atlas does not apply there; the other two do.
+    - Checked: ps3recomp-local.patch regenerated and applied to a clean ps3recomp checkout (files identical);
+      Windows build (clang-cl + xwin); sandbox runs under Proton with LD_TEX_PAD=xbox and a scripted
+      pad on the USA disc: all three atlases load, the help line shows A / B / X, the menu tabs LT / RT, the HUD
+      slots LB / RB / X. One of four runs stalled at boot (frame 390; the next run of the same build was fine).
+      Not checked: a real Xbox pad or DualShock on Windows (the Sony detection has never run on a real PC).
+
 209. **Native Linux / macOS: Storm King beach missing rocks -- fix 64 again, in the draw engine (2026-11-16, user report
     after a full boss rush on the Steam Deck: "missing level geometry in the storm king fight")**
     - rsx_draw_engine.c (Vulkan and Metal) queued a draw's DRAW_ARRAYS / DRAW_INDEX_ARRAY packets in

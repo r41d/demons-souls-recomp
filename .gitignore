@@ -17,6 +17,7 @@
 /textures/dump/
 /textures/replace/
 /textures/kbm/
+/textures/xbox/
 /models/*
 !/models/README.txt
 /.venv/
