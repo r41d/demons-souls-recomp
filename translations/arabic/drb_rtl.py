@@ -20,6 +20,9 @@ WINDOW = 12     # Text shapes this far apart in the file count as neighbours
 # FMG 76 (menu common text) holds the stat / defence / resistance labels; their values are placed by other parts of
 # the layout that this check cannot pair them with, so those labels stay left-aligned
 KEEP_FMG = 76
+# HUD names next to their item / magic slot (the box starts at the slot and runs far to the right): left-aligned,
+# the text stays beside its slot (right-aligned it ended 200 px away from it)
+KEEP_SHAPES = {1983, 1984}
 # the value-overlap check (off: in game it also kept titles and help lines left that were fine right-aligned)
 CHECK_VALUES = False
 
@@ -57,7 +60,7 @@ def main(src, dst):
         if d[t['off'] + 0x16] & 3:
             continue
         cat = struct.unpack_from('>I', d, t['off'] + 0x1C)[0] if d[t['off'] + 0x17] == 1 else None
-        if cat == KEEP_FMG:
+        if cat == KEEP_FMG or t['i'] in KEEP_SHAPES:
             kept += 1
             continue
         r = rect(d, t['off'])
