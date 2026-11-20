@@ -7,9 +7,11 @@ How it imitates the original logo:
   drawn up into a tall blade point (its sword-like "l"; no cross-guard, which on a letter would read as a cross), and the final ز's tail drawn out into a long spike (its "S");
 - the two words on a diagonal, the second tucked under the end of the first, inside the original's box
   (x 128-1153, y 72-497 of 1280x720), small TM at the end;
-- surface: bright white with clusters of dark specks near the edges, chips out of the edges, and long straight
-  hairline cracks running across letters.
+- surface: bright white with clusters of dark specks near the edges, and chips out of the edges;
+- breaks: short cuts across single strokes with that piece nudged, from logo_cuts.json (made with the cut editor
+  page; apply_cuts is the same rule the page uses).
 """
+import json
 import math
 import os
 
@@ -206,26 +208,118 @@ def letters():
     return facet(m, 3.0 * S), (tmx, tmy)
 
 
+def _slice(d, x, y, rng, length=None, width=None):
+    """A thin dark slice through (x, y): near horizontal or gently diagonal, slightly bent, pointed at both ends."""
+    ang = math.radians(rng.choice([1, -1]) * rng.uniform(4, 38) + (180 if rng.random() < 0.5 else 0))
+    L = (length or rng.uniform(55, 200)) * S
+    w = (width or rng.uniform(2.4, 4.2)) * S
+    bend = rng.uniform(-8, 8) * S
+    ux, uy = math.cos(ang), math.sin(ang)
+    px, py = -uy, ux
+    top, bot = [], []
+    n = 24
+    for i in range(n + 1):
+        t = i / n
+        c = (t - 0.5) * L
+        off = bend * (1 - (2 * t - 1) ** 2)
+        hw = w / 2 * math.sin(math.pi * t) ** 0.6
+        cx, cy = x + ux * c + px * off, y + uy * c + py * off
+        top.append((cx + px * hw, cy + py * hw))
+        bot.append((cx - px * hw, cy - py * hw))
+    d.polygon(top + bot[::-1], fill=0)
+
+
+def _bilinear(a, x, y):
+    h, w = a.shape
+    x = np.clip(x, 0, w - 1.001)
+    y = np.clip(y, 0, h - 1.001)
+    x0, y0 = x.astype(int), y.astype(int)
+    fx, fy = x - x0, y - y0
+    return ((a[y0, x0] * (1 - fx) + a[y0, x0 + 1] * fx) * (1 - fy) +
+            (a[y0 + 1, x0] * (1 - fx) + a[y0 + 1, x0 + 1] * fx) * fy)
+
+
+CUTS_FILE = os.path.join(HERE, 'logo_cuts.json')
+
+
+def default_cuts(m, rng, n):
+    """The logo's breaks when there is no logo_cuts.json: n short cuts, each straight across one stroke (edge to
+    edge), mostly vertical, spread over the letters. Returned in the cut format below (1x screen pixels)."""
+    h, w = m.shape
+    thick = _erode(m, 7 * S)                 # inside a stroke at least ~14 px thick
+    ys, xs = np.nonzero(thick)
+    used, cuts, tries = [], [], 0
+    while len(cuts) < n and tries < 400:
+        tries += 1
+        k = rng.integers(len(ys))
+        x0, y0 = int(xs[k]), int(ys[k])
+        if any(math.hypot(x0 - ux, y0 - uy) < 105 * S for ux, uy in used):
+            continue                         # spread out: not two breaks side by side
+        ang = math.radians(90 + rng.uniform(-30, 30) + rng.choice([0, 180]))   # mostly vertical cuts
+        ux, uy = math.cos(ang), math.sin(ang)
+        ends = []                            # walk both ways along the cut until out of the stroke
+        for sgn in (1, -1):
+            t = 0
+            while t < 90 * S:
+                xx, yy = int(x0 + sgn * ux * t), int(y0 + sgn * uy * t)
+                if not (0 <= xx < w and 0 <= yy < h) or not m[yy, xx]:
+                    break
+                t += 1
+            ends.append(t)
+        if max(ends) >= 90 * S or sum(ends) < 16 * S:
+            continue                         # along a stroke rather than across it, or too thin
+        used.append((x0, y0))
+        e1, e2 = ends[0] + 3 * S, ends[1] + 3 * S
+        cuts.append({'x1': round((x0 - ux * e2) / S, 1), 'y1': round((y0 - uy * e2) / S, 1),
+                     'x2': round((x0 + ux * e1) / S, 1), 'y2': round((y0 + uy * e1) / S, 1),
+                     'gap': round(float(rng.uniform(2.2, 3.0)), 2),
+                     'slide': round(float(rng.choice([-1, 1]) * rng.uniform(1.6, 3.0)), 2),
+                     'fade': 20.0, 'flip': False})
+    return cuts
+
+
+def apply_cuts(a, cuts):
+    """Apply breaks to a greyscale picture (float, 0-255), one after the other. A cut is a segment (x1,y1)-(x2,y2) in
+    1280x720 pixels. The side to the left of the direction 1->2 (the right side with flip) moves: it opens by `gap`
+    and slides `slide` px along the cut, the shift fading out over `fade` px away from the cut and over 7 px past
+    its ends; then the opened gap along the segment is drawn black. The cut editor page does exactly the same."""
+    h, w = a.shape
+    a = a.astype(np.float32)
+    yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
+    for c in cuts:
+        x1, y1, x2, y2 = (float(c[k]) for k in ('x1', 'y1', 'x2', 'y2'))
+        L = math.hypot(x2 - x1, y2 - y1)
+        if L < 1:
+            continue
+        ux, uy = (x2 - x1) / L, (y2 - y1) / L
+        nx, ny = -uy, ux
+        if c.get('flip'):
+            nx, ny = -nx, -ny
+        cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
+        gap, sl, fade = float(c.get('gap', 2.5)), float(c.get('slide', 0)), max(float(c.get('fade', 20)), 1.0)
+        t = (xx - cx) * ux + (yy - cy) * uy
+        nn = (xx - cx) * nx + (yy - cy) * ny
+        along = np.clip(1 - np.maximum(-L / 2 - t, t - L / 2) / 7.0, 0, 1)
+        fall = np.where(nn > 0, np.exp(-np.maximum(nn, 0) / fade) * along, 0)
+        sx, sy = (ux * sl + nx * gap) * fall, (uy * sl + ny * gap) * fall
+        a = np.where(nn > 0, _bilinear(a, xx - sx, yy - sy), a)
+        line = (np.abs(nn - gap * 0.5) < gap * 0.5) & (np.abs(t) < L / 2)
+        a = np.where(line, 0, a)
+    return a
+
+
 def _noise(shape, scale, rng):
     h, w = shape
     g = Image.fromarray((rng.random((h // scale + 2, w // scale + 2)) * 255).astype(np.uint8))
     return np.asarray(g.resize((w, h), Image.BICUBIC)).astype(np.float32) / 255
 
 
-def logo(seed=11):
+def base_logo(seed=11):
+    """The textured logo before the breaks (also the cut editor's base picture), and its 2x letter mask."""
     rng = np.random.default_rng(seed)
     m2, (tmx, tmy) = letters()
     big = Image.fromarray((m2 * 255).astype(np.uint8))
     d = ImageDraw.Draw(big)
-    ys, xs = np.nonzero(m2)
-    # long straight hairline cracks across letters, as on the original
-    for _ in range(14):
-        k = rng.integers(len(ys))
-        ang = math.radians(rng.choice([rng.uniform(15, 55), rng.uniform(125, 165)]))
-        L = rng.uniform(80, 300) * S
-        x, y = xs[k], ys[k]
-        d.line((x - math.cos(ang) * L / 2, y - math.sin(ang) * L / 2, x + math.cos(ang) * L / 2,
-                y + math.sin(ang) * L / 2), fill=0, width=2)
     # chips out of the edges: small dark wedges cut in at edge points
     edge = m2 & ~_erode(m2, 2)
     ey, ex = np.nonzero(edge)
@@ -243,13 +337,25 @@ def logo(seed=11):
     fine = _noise(a.shape, 1, rng)
     speck = zone & (fine > 0.70)
     a = a * np.where(speck, 0.08, 1.0)
-    a = a * np.where(zone & (fine > 0.55) & ~speck, 0.6, 1.0)
     a = a * np.where(fine > 0.985, 0.15, 1.0)
     img = Image.fromarray((np.clip(a, 0, 1) * 248).astype(np.uint8))
     tm = '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'
     ImageDraw.Draw(img).text((tmx - 4, tmy), 'TM', fill=225, anchor='rb',
                              font=ImageFont.truetype(tm, 14) if os.path.exists(tm) else None)
-    return img
+    return img, m2
+
+
+def logo(seed=11, cuts=None):
+    """The finished logo: the base picture with its breaks (logo_cuts.json, made with the cut editor; or the
+    default ones)."""
+    img, m2 = base_logo(seed)
+    if cuts is None:
+        if os.path.exists(CUTS_FILE):
+            cuts = json.load(open(CUTS_FILE, encoding='utf-8'))['cuts']
+        else:
+            cuts = default_cuts(m2, np.random.default_rng(seed + 1), 9)
+    a = apply_cuts(np.asarray(img).astype(np.float32), cuts)
+    return Image.fromarray(np.clip(a + 0.5, 0, 255).astype(np.uint8))
 
 
 if __name__ == '__main__':

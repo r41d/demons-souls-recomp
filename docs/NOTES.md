@@ -4097,7 +4097,7 @@ Don't run ps3recomp tools with `-P`/`-I`: they import sibling modules from their
       grows.
     - Title: the logo is MENU/menu.tpf "Title" (BC1 1024x1024). Sprite A shows texture 0,0-1024,720 at screen
       0-1024; sprite B shows texture 0,729-720,985 turned a quarter turn at screen 1024-1280. The game's own
-      animation keeps working. MOVIE/ds_title.pam (the logo forming out of smoke: MPEG-2 1280x720 29.97, 300
+      animation keeps working. The logo picture is by community member MrSuS60 (made with Gemini). MOVIE/ds_title.pam (the logo forming out of smoke: MPEG-2 1280x720 29.97, 300
       frames, GOP 18, LPCM) is redrawn from the Arabic logo:
       - the original's smoke is the English logo's own shape, so it cannot just be swapped;
       - the frames are encoded with ffmpeg and poured into the original's video PES packets in place;
