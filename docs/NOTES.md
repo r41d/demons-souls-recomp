@@ -4077,6 +4077,43 @@ Don't run ps3recomp tools with `-P`/`-I`: they import sibling modules from their
       limit, 164 joins, all completed, same screens as fix 305; PS3RECOMP_JOIN_WAIT_MS=1, the limit fires once
       with the new log line and the game carries on. Not checked: native Windows, the Mac (play.sh change only).
 
+160. **Arabic translation of the USA release, built from the player's own files (2026-11-20, RTX 3070 PC, Linux via Proton):**
+    - Request: an Arabic translation, asked for by a community member; two native speakers reviewed it (word choices,
+      a meaning-first classical register to match FromSoftware's archaic English, numbers written as words, the
+      copyright line). translations/arabic/install_arabic.py builds everything from game/ and installs it over the
+      NA_ENGLISH files, with the originals kept in game/arabic_backup (--uninstall). The repo holds only our Arabic
+      (ar_text.json: 3,480 menu + 6,470 item strings), tools, OFL fonts and the logo picture.
+    - Text engine (static study of the EBOOT): one glyph per code point, drawn left to right, no shaping, no bidi, no
+      kerning; auto-wrap breaks at any character. So every string is stored pre-shaped (presentation forms U+FE80-FEFC,
+      lam-alef) and in visual order per line, and long FMGs are re-wrapped in logical order to the widest English
+      line of the same FMG, measured with the game's own advances. '#' is an escape, '<?tag?>' tags stay as units.
+    - Fonts: 129 Arabic forms drawn from Noto Sans Arabic into dsfont24 / talkfont24, in the empty bottom of the page
+      and in cells of characters the US text never uses. Joining forms reach the cell edge and overlap by 1 px.
+      Dots get at least 2 px of gap, because menus draw text at about 0.75x and Noto's 1-px gaps merged. 0-9 are
+      redrawn as Arabic-Indic digits in their own cells, so numbers drawn by code (stats, souls, timers) change too.
+    - Layout: MENU/menu.drb Text shapes are right-aligned (SHPR+0x16 bit 0), except FMG 76 labels, whose values are
+      placed elsewhere. The options "HUD" label is a literal ("HUD表示"; the font has no 表示): its shape now reads
+      FMG 70 id 6104, a string we add. Appending to the STR section made the game stall at boot, so the file never
+      grows.
+    - Title: the logo is MENU/menu.tpf "Title" (BC1 1024x1024). Sprite A shows texture 0,0-1024,720 at screen
+      0-1024; sprite B shows texture 0,729-720,985 turned a quarter turn at screen 1024-1280. The game's own
+      animation keeps working. MOVIE/ds_title.pam (the logo forming out of smoke: MPEG-2 1280x720 29.97, 300
+      frames, GOP 18, LPCM) is redrawn from the Arabic logo:
+      - the original's smoke is the English logo's own shape, so it cannot just be swapped;
+      - the frames are encoded with ffmpeg and poured into the original's video PES packets in place;
+      - the video packets left over become 0xBE padding, and the header and audio are unchanged;
+      - the movie player reads the packs in order and does not use the PAMF entry-point map.
+    - Checked (sandbox, US disc, Proton):
+      - title, profiles, tutorial intro subtitles, inventory (short and long descriptions), stats, system menu and
+        options, all in Arabic, right-aligned, with Arabic digits;
+      - install output byte-identical to the tested files, and --uninstall restores the game exactly;
+      - title movie: the recomp's own demuxer (sail_mpegps.c built natively) gives 300 pictures with no errors, the
+        audio is byte-identical, and the sequence parameters match the original.
+    - Not checked: Windows; the title movie in game (Proton has no Media Foundation MPEG-2 decoder, so no movie
+      plays there); NPC talk boxes and blood messages on screen. Still English: pictures with text (NOW LOADING,
+      YOU DIED, area titles), the HUD's L / R hand labels (drawn by code), and the help line's alignment (placed by
+      code).
+
 209. **Native Linux / macOS: Storm King beach missing rocks -- fix 64 again, in the draw engine (2026-11-16, user report
     after a full boss rush on the Steam Deck: "missing level geometry in the storm king fight")**
     - rsx_draw_engine.c (Vulkan and Metal) queued a draw's DRAW_ARRAYS / DRAW_INDEX_ARRAY packets in

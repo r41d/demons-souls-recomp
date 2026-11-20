@@ -157,6 +157,20 @@ launcher's *Extra settings*, or before `PLAY.bat` / `linux/play.sh`. Notes:
   Not tested on the European release yet: boss rush, the PC Remaster mod, and the native Linux, macOS and Android
   builds.
 
+### Arabic translation (USA disc, experimental)
+
+An Arabic translation of the USA release, made for this port with native Arabic speakers from the community
+(translations/arabic/). It is built on your PC from your own game files and installed over them; the originals are
+kept in `game/arabic_backup`. With `game/` set up (and the game closed):
+- Windows: `.venv\Scripts\python translations\arabic\install_arabic.py`
+- Linux / macOS: `.venv/bin/python translations/arabic/install_arabic.py`
+- `--uninstall` puts the English files back. Run it again after an update.
+
+It covers the menus, item text, dialogue and subtitles (right to left, Arabic digits), the title logo and the title
+movie (the movie needs [ffmpeg](https://ffmpeg.org) on PATH; Windows: `winget install Gyan.FFmpeg`). Still English:
+pictures with text (NOW LOADING, YOU DIED, area titles), the L / R hand labels and the button help line's alignment.
+Tested on Linux through Proton, except the title movie, which Proton does not play; not tested on Windows yet.
+
 ## Updating
 
 Press **Check for updates** in the launcher. It downloads the newest release (no Git needed), rebuilds what
@@ -294,6 +308,7 @@ setup/                       setup pipeline, toolchain finder, Linux cross toolc
 project/                     CMake project
 patches/                     ps3recomp-local.patch (runtime, on ps3recomp @ 4e8f3ca) and lifted-code.patch (game code)
 tools/                       disc extraction, SPU lifting, perf report, mod installer, model tool
+translations/arabic/         Arabic translation: our text, fonts (OFL) and the installer that builds it from your game
 docs/NOTES.md                development log: every fix, why, and how it was measured
 linux/, mac/                 Linux / Steam Deck kit and macOS build (docs/LINUX.md, docs/MACOS.md)
 android/                     Android (arm64) build: APK project, entry point, build scripts (docs/ANDROID.md)
