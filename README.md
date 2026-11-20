@@ -149,8 +149,8 @@ on-screen keyboard (the character is named "Slayer"), and rumble. Details, measu
 
 SETUP builds the European release too, from your own European disc image: it reads which disc it is and uses
 `patches/lifted-code-eu.patch`, the port's edits carried over to the European EBOOT. The European game picks its
-language from the system language: set **`PS3_LANG=fr`** (or `de`, `es`, `it`; anything else gives English) in the
-launcher's *Extra settings*, or before `PLAY.bat` / `linux/play.sh`. Notes:
+language from the system language: pick it under **Language** in the launcher (Windows and native Linux), or set
+**`PS3_LANG=fr`** (or `de`, `es`, `it`; anything else gives English) before `PLAY.bat` / `linux/play.sh`. Notes:
 - Use a separate folder for each release. Switching one folder from one disc to the other is not supported.
 - European saves are separate from US ones (the save folders are named after the disc, BLES00932...).
 - Tested on Linux through Proton: setup, a new character into the tutorial at 30 and 60 fps, and the French text.
@@ -160,15 +160,18 @@ launcher's *Extra settings*, or before `PLAY.bat` / `linux/play.sh`. Notes:
 ### Arabic translation (USA disc, experimental)
 
 An Arabic translation of the USA release, made for this port with native Arabic speakers from the community
-(translations/arabic/). It is built on your PC from your own game files and installed over them; the originals are
-kept in `game/arabic_backup`. With `game/` set up (and the game closed):
-- Windows: `.venv\Scripts\python translations\arabic\install_arabic.py`
-- Linux / macOS: `.venv/bin/python translations/arabic/install_arabic.py`
-- `--uninstall` puts the English files back. Run it again after an update.
+(translations/arabic/). Pick **العربية (Arabic)** under **Language** in the launcher (Windows and native Linux) and
+press Play: the first time it is built from your own game files and installed over them (about two minutes; the
+originals are kept in `game/arabic_backup`), and choosing English puts them back. Without the launcher (or on
+macOS), with the game closed:
+- Windows: `.venv\Scripts\python translations\translations.py apply ar` (`apply en` for English)
+- Linux / macOS: `.venv/bin/python translations/translations.py apply ar`
+- Run it again after an update.
 
 It covers the menus, item text, dialogue and subtitles (right to left, Arabic digits), the title logo and the title
 movie (the movie needs [ffmpeg](https://ffmpeg.org) on PATH; Windows: `winget install Gyan.FFmpeg`). Still English:
-pictures with text (NOW LOADING, YOU DIED, area titles), the L / R hand labels and the button help line's alignment.
+pictures with text (NOW LOADING, YOU DIED, area titles) and the button help line's alignment. The HUD's L / R hand
+labels read يس / يم.
 Tested on Linux through Proton, except the title movie, which Proton does not play; not tested on Windows yet.
 
 ## Updating

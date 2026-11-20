@@ -74,6 +74,7 @@ struct Settings {
     bool vrr = false;         // DES_VRR: a G-Sync / FreeSync screen (vsync off may tear, 60 fps vsync off)
     int br_souls = 2;         // DES_BR_SOULS: boss rush souls multiplier (BR_SOULS_CHOICES); 2x unless chosen
     bool gpu_warm = false;    // LD_GPU_WARM=2: GPU power smoothing (NOTES fix 203); other levels by hand
+    wstring lang = L"en";     // language: a translations\translations.py choice id (NOTES fix 162)
     wstring extra;            // NAME=value NAME=value ...
 };
 static Settings g_set;
@@ -188,6 +189,8 @@ static void load_settings() {
     int warm = ini_int(L"gpu_smoothing", -1);
     if (warm < 0) take_extra_gpu_warm(s);   // no line yet: LD_GPU_WARM=2 typed in Extra settings (fix 203) ticks it
     else s.gpu_warm = warm != 0;
+    GetPrivateProfileStringW(L"launcher", L"language", L"en", buf, 2048, g_ini.c_str());
+    s.lang = buf[0] ? buf : L"en";
     load_keys();
 }
 
@@ -212,9 +215,11 @@ static void save_settings() {
     ini_put(L"boss_rush_souls", s.br_souls);
     ini_put(L"gpu_smoothing", s.gpu_warm);
     ini_put(L"extra", s.extra);
+    ini_put(L"language", s.lang);
     save_keys();
 }
 
+static wstring game_dir(int g) { return g_root + L"\\" + GAME_DIRS[g]; }   // what DES_GAME names (boss rush: game)
 static bool game_present(int g) { return exists(g_root + L"\\" + GAME_DIRS[g] + L"\\PS3_GAME\\USRDIR\\EBOOT.elf"); }
 static wstring exe_path() { return at(L"port\\build_opt\\DemonsSoulsRecomp.exe"); }
 static wstring pending_marker() { return at(L"update_pending.txt"); }
@@ -248,6 +253,9 @@ static bool parse_extra(const wstring& text, std::vector<std::pair<wstring, wstr
     return true;
 }
 
+// A language choice's "env" from translations.py list, e.g. PS3_LANG=fr (NOTES fix 162).
+using LangEnv = std::vector<std::pair<wstring, wstring>>;
+
 // The environment PLAY.bat gets: the launcher's own (left unchanged, so nothing from one run stays
 // set for the next or reaches REPORT.bat / the update) with the choices on top.
 struct EnvBlock {
@@ -277,7 +285,7 @@ struct EnvBlock {
 
 // The same variables the README's "set X=..." lines use. Every one is set
 // or cleared, so a variable left over in this Windows session does not change what the window says.
-static wstring game_env(const Settings& s) {
+static wstring game_env(const Settings& s, const LangEnv* lang) {
     EnvBlock eb;
     auto env = [&](const wchar_t* k, const wchar_t* v) { eb.set(k, v); };
     auto envif = [&](const wchar_t* k, bool on, const wchar_t* v) { eb.set(k, on ? v : nullptr); };
@@ -304,6 +312,9 @@ static wstring game_env(const Settings& s) {
     envif(L"DES_SKIP_INTRO", s.skip_intro, L"1");
     envif(L"DES_VRR", s.vrr, L"1");
     envif(L"LD_GPU_WARM", s.gpu_warm, L"2");
+    env(L"PS3_LANG", nullptr);   // English unless the language choice says otherwise (fix 162)
+    if (lang)
+        for (auto& kv : *lang) env(kv.first.c_str(), kv.second.c_str());   // before the extra settings: those win
     std::vector<std::pair<wstring, wstring>> extra;
     parse_extra(s.extra, &extra, nullptr);
     for (auto& kv : extra)
@@ -405,7 +416,7 @@ static bool can_play(HWND w, const Settings& s) {
     return true;
 }
 
-static HANDLE start_game(const Settings& s) {
+static HANDLE start_game(const Settings& s, const LangEnv* lang) {
     // The keyboard / mouse button icons follow the bindings (fix 103): kbm_icons.py --if-stale draws them again when
     // they or its art changed (a few seconds), else returns at once. No Python environment: the icons stay as they are.
     wstring py = at(L".venv\\Scripts\\python.exe"), tool = at(L"tools\\kbm_icons.py");
@@ -415,7 +426,7 @@ static HANDLE start_game(const Settings& s) {
             CloseHandle(h);
         }
     }
-    wstring env = game_env(s);
+    wstring env = game_env(s, lang);
     return run_cmd(q(at(L"PLAY.bat")), false, &env);
 }
 
@@ -425,10 +436,11 @@ static HANDLE start_game(const Settings& s) {
 enum {
     ID_PLAY = IDOK, ID_FPS = 100, ID_CUSTOM, ID_FPS_HINT, ID_RES, ID_SHADOW, ID_GAME0, ID_GAME1, ID_GAME2, ID_GAME3,
     ID_FULLSCREEN, ID_MOVIES, ID_GOD, ID_RECORD, ID_DUMP, ID_LETTER, ID_PIN, ID_NOREBUILD, ID_SKIPINTRO, ID_VRR, ID_EXTRA,
-    ID_UPDATE, ID_REPORT, ID_CONTROLS, ID_FOLDERS, ID_STATUS, ID_BRSOULS, ID_GPUWARM,
+    ID_UPDATE, ID_REPORT, ID_CONTROLS, ID_FOLDERS, ID_STATUS, ID_BRSOULS, ID_GPUWARM, ID_LANG,
     ID_F_SAVES = 200, ID_F_LOGS, ID_F_PERF, ID_F_REPLACE, ID_F_DUMP, ID_F_CAPTURES, ID_F_MODELS, ID_F_ROOT,
 };
 static const UINT WM_GAME_DONE = WM_APP + 1, WM_UPDATE_CHECKED = WM_APP + 2;
+static const UINT WM_LANG_LIST = WM_APP + 3, WM_LANG_LINE = WM_APP + 4, WM_LANG_DONE = WM_APP + 5;   // fix 162
 
 static HWND g_wnd, g_tip;
 static HFONT g_font, g_font_big, g_font_title;
@@ -436,6 +448,9 @@ static Gdiplus::Bitmap* g_banner;
 static int g_dpi = 96, g_hz = 60;
 static HANDLE g_game;
 static bool g_loading;
+static bool g_lang_busy;          // Play is getting the language ready (translations.py list / apply, fix 162)
+static wstring g_lang_line;       // its last progress line, for the status line
+static wstring g_lang_note;       // why the Language list has English only (no Python, ...)
 
 static int S(int v) { return MulDiv(v, g_dpi, 96); }
 static HWND item(int id) { return GetDlgItem(g_wnd, id); }
@@ -553,6 +568,8 @@ static void update_status() {
     if (!g_update_notice.empty() && exists(exe_path()))
         s = L"New version " + widen(g_update_notice) + L" is available: press Check for updates.";
     if (exists(pending_marker()) && !g_game) s = L"The last update did not finish building: press Check for updates.";
+    if (!g_lang_note.empty()) s += (s.empty() ? L"" : L"  \u00b7  ") + g_lang_note;
+    if (g_lang_busy) s = g_lang_line.empty() ? wstring(L"Getting the language ready...") : g_lang_line;
     if (g_game) s = L"Playing. The logos and the first load take about a minute.";
     SetWindowTextW(item(ID_STATUS), s.c_str());
 }
@@ -629,12 +646,10 @@ static DWORD WINAPI wait_game(void* h) {
     return 0;
 }
 
-static void on_play() {
-    if (g_game) return;
-    read_controls();
-    save_settings();
-    if (!can_play(g_wnd, g_set)) return;
-    g_game = start_game(g_set);
+static void lang_then_play();   // below: the language first (fix 162), then play_with
+
+static void play_with(const LangEnv& lang) {
+    g_game = start_game(g_set, &lang);
     if (!g_game) {
         MessageBoxW(g_wnd, L"Could not start PLAY.bat.", L"Demon's Souls", MB_ICONERROR);
         return;
@@ -645,6 +660,14 @@ static void on_play() {
     update_status();
     if (HANDLE t = CreateThread(nullptr, 0, wait_game, g_game, 0, nullptr)) CloseHandle(t);
     ShowWindow(g_wnd, SW_MINIMIZE);
+}
+
+static void on_play() {
+    if (g_game || g_lang_busy) return;
+    read_controls();
+    save_settings();
+    if (!can_play(g_wnd, g_set)) return;
+    lang_then_play();
 }
 
 // The update script deletes this after a good BUILD.bat; while it is there (and the game exe is not
@@ -661,12 +684,27 @@ static bool build_pending() {
     return true;
 }
 
-struct ReadPipe { HANDLE rd; std::string* out; };
+// line: also called with each whole line as it comes (without the line end), for progress.
+struct ReadPipe {
+    HANDLE rd;
+    std::string* out;
+    void (*line)(const std::string&, void*) = nullptr;
+    void* ctx = nullptr;
+};
 static DWORD WINAPI read_pipe(void* p) {
     ReadPipe* r = (ReadPipe*)p;
     char buf[4096];
     DWORD n;
-    while (ReadFile(r->rd, buf, sizeof buf, &n, nullptr) && n) r->out->append(buf, n);
+    size_t done = 0;   // the lines up to here went to r->line
+    while (ReadFile(r->rd, buf, sizeof buf, &n, nullptr) && n) {
+        r->out->append(buf, n);
+        for (size_t e; r->line && (e = r->out->find('\n', done)) != std::string::npos; done = e + 1) {
+            std::string l = r->out->substr(done, e - done);
+            if (!l.empty() && l.back() == '\r') l.pop_back();
+            r->line(l, r->ctx);
+        }
+    }
+    if (r->line && done < r->out->size()) r->line(r->out->substr(done), r->ctx);
     return 0;
 }
 
@@ -856,9 +894,11 @@ static void on_update_checked(UpdateCheck* c) {
         return;
     }
     g_checking = false;
-    EnableWindow(item(ID_UPDATE), !g_game);
+    EnableWindow(item(ID_UPDATE), !g_game && !g_lang_busy);
     update_status();
-    if (g_game) return;   // the player started the game meanwhile; the answer can wait for the next press
+    // The player started the game meanwhile (or PLAY is putting a language in place, fix 162: an update now would
+    // close the launcher halfway); the answer can wait for the next press.
+    if (g_game || g_lang_busy) return;
     if (c->zip) {
         if (!c->counted) {
             // update.py prints error=... when GitHub did not answer; no such line = its Python did not run
@@ -905,7 +945,7 @@ static void on_update_checked(UpdateCheck* c) {
 }
 
 static void on_update() {
-    if (g_checking) return;
+    if (g_checking || g_lang_busy) return;
     if (g_game) {   // the build would fail on the running game's exe
         MessageBoxW(g_wnd, L"Close the game first: the update rebuilds it.", L"Check for updates", MB_ICONINFORMATION);
         return;
@@ -958,6 +998,373 @@ static void on_update() {
     g_checking = true;
     EnableWindow(item(ID_UPDATE), FALSE);
     SetWindowTextW(item(ID_STATUS), L"Checking for updates...");
+}
+
+// ---- the Language setting (NOTES fix 162) -----------------------------------------------------------------
+// translations\translations.py is the one place that knows the choices: "list --game <folder>" prints them as one
+// line of JSON (English; the European disc's own French, German, Spanish and Italian, which only need PS3_LANG; the
+// custom translations, which are installed into the game folder), "apply <id> --game <folder>" installs or removes
+// translation files and ends with "OK <id>". The Linux launcher runs the same script, so both show the same list.
+
+// Just enough JSON for list's output: objects, arrays, strings (kept as UTF-8), true / false / null; numbers skipped.
+struct JVal {
+    enum Type { NUL, BOOL, NUM, STR, ARR, OBJ } t = NUL;
+    bool b = false;
+    std::string s;
+    std::vector<JVal> items;          // an array's values, or an object's (their names in keys)
+    std::vector<std::string> keys;
+    const JVal* get(const char* k) const {
+        for (size_t i = 0; t == OBJ && i < keys.size(); ++i)
+            if (keys[i] == k) return &items[i];
+        return nullptr;
+    }
+};
+struct JParse {
+    const char *p, *e;
+    void ws() { while (p < e && (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n')) ++p; }
+    bool lit(const char* w) {
+        size_t n = strlen(w);
+        if ((size_t)(e - p) < n || memcmp(p, w, n)) return false;
+        p += n;
+        return true;
+    }
+    int hex4() {
+        if (e - p < 4) return -1;
+        int v = 0;
+        for (int i = 0; i < 4; ++i, ++p) {
+            char c = *p;
+            v = v * 16 + (c >= '0' && c <= '9' ? c - '0' : c >= 'a' && c <= 'f' ? c - 'a' + 10 : c >= 'A' && c <= 'F' ? c - 'A' + 10 : -9999);
+        }
+        return v < 0 ? -1 : v;
+    }
+    static void utf8(std::string& o, unsigned cp) {
+        if (cp < 0x80) o += (char)cp;
+        else if (cp < 0x800) { o += (char)(0xC0 | cp >> 6); o += (char)(0x80 | (cp & 0x3F)); }
+        else if (cp < 0x10000) { o += (char)(0xE0 | cp >> 12); o += (char)(0x80 | (cp >> 6 & 0x3F)); o += (char)(0x80 | (cp & 0x3F)); }
+        else { o += (char)(0xF0 | cp >> 18); o += (char)(0x80 | (cp >> 12 & 0x3F)); o += (char)(0x80 | (cp >> 6 & 0x3F)); o += (char)(0x80 | (cp & 0x3F)); }
+    }
+    bool str(std::string& o) {
+        if (p >= e || *p != '"') return false;
+        for (++p; p < e;) {
+            char c = *p++;
+            if (c == '"') return true;
+            if (c != '\\') { o += c; continue; }
+            if (p >= e) return false;
+            switch (c = *p++) {
+            case 'b': o += '\b'; break;
+            case 'f': o += '\f'; break;
+            case 'n': o += '\n'; break;
+            case 'r': o += '\r'; break;
+            case 't': o += '\t'; break;
+            case 'u': {
+                int cp = hex4();
+                if (cp < 0) return false;
+                if (cp >= 0xD800 && cp < 0xDC00 && e - p >= 6 && p[0] == '\\' && p[1] == 'u') {   // a surrogate pair
+                    p += 2;
+                    int lo = hex4();
+                    if (lo < 0xDC00 || lo > 0xDFFF) return false;
+                    cp = 0x10000 + ((cp - 0xD800) << 10) + (lo - 0xDC00);
+                }
+                utf8(o, (unsigned)cp);
+                break;
+            }
+            default: o += c;   // " \ /
+            }
+        }
+        return false;
+    }
+    bool val(JVal& v, int depth) {
+        ws();
+        if (p >= e || depth > 32) return false;
+        if (*p == '{' || *p == '[') {
+            const bool obj = *p++ == '{';
+            v.t = obj ? JVal::OBJ : JVal::ARR;
+            ws();
+            if (p < e && *p == (obj ? '}' : ']')) { ++p; return true; }
+            for (;;) {
+                if (obj) {
+                    ws();
+                    v.keys.emplace_back();
+                    if (!str(v.keys.back())) return false;
+                    ws();
+                    if (p >= e || *p++ != ':') return false;
+                }
+                v.items.emplace_back();
+                if (!val(v.items.back(), depth + 1)) return false;
+                ws();
+                if (p >= e) return false;
+                char c = *p++;
+                if (c == (obj ? '}' : ']')) return true;
+                if (c != ',') return false;
+            }
+        }
+        if (*p == '"') { v.t = JVal::STR; return str(v.s); }
+        if (lit("true")) { v.t = JVal::BOOL; v.b = true; return true; }
+        if (lit("false")) { v.t = JVal::BOOL; return true; }
+        if (lit("null")) return true;
+        const char* s0 = p;
+        while (p < e && strchr("+-.eE0123456789", *p)) ++p;
+        v.t = JVal::NUM;
+        return p > s0;
+    }
+};
+static wstring jstr(const JVal* v) { return v && v->t == JVal::STR ? widen(v->s) : wstring(); }
+
+static wstring last_line(const std::string& t) {   // the reason a Python script gives on stderr is its last line
+    size_t e = t.find_last_not_of("\r\n \t");
+    if (e == std::string::npos) return L"";
+    size_t b = t.find_last_of('\n', e);
+    return widen(t.substr(b == std::string::npos ? 0 : b + 1, e + 1 - (b == std::string::npos ? 0 : b + 1)));
+}
+
+// translations.py <args> with the setup's Python (or python.exe on PATH without it), hidden. stdout in *out (line:
+// each line as it comes), stderr in *err. Returns the exit code, or -1 when it did not run (why says why).
+static int run_translations(const wstring& args, std::string* out, std::string* err,
+                            void (*line)(const std::string&, void*), void* ctx, DWORD timeout_ms, wstring* why) {
+    out->clear();
+    err->clear();
+    wstring py = venv_python(), script = at(L"translations\\translations.py");
+    wchar_t buf[MAX_PATH];
+    if (!exists(py)) py = SearchPathW(nullptr, L"python.exe", nullptr, MAX_PATH, buf, nullptr) ? buf : L"";
+    if (py.empty()) { *why = L"no Python found: run SETUP.bat"; return -1; }
+    if (!exists(script)) { *why = L"translations\\translations.py is missing"; return -1; }
+    SECURITY_ATTRIBUTES sa{sizeof sa, nullptr, TRUE};
+    HANDLE ord = nullptr, owr = nullptr, erd = nullptr, ewr = nullptr;
+    if (!CreatePipe(&ord, &owr, &sa, 0)) { *why = L"no pipe"; return -1; }
+    if (!CreatePipe(&erd, &ewr, &sa, 0)) { CloseHandle(ord); CloseHandle(owr); *why = L"no pipe"; return -1; }
+    SetHandleInformation(ord, HANDLE_FLAG_INHERIT, 0);
+    SetHandleInformation(erd, HANDLE_FLAG_INHERIT, 0);
+    EnvBlock eb;   // the labels are not ASCII (Arabic): UTF-8 both ways, and each line as soon as it is printed
+    eb.set(L"PYTHONIOENCODING", L"utf-8");
+    eb.set(L"PYTHONUNBUFFERED", L"1");
+    wstring env = eb.block();
+    wstring cmd = q(py) + L" " + q(script) + L" " + args;
+    STARTUPINFOW si{};
+    si.cb = sizeof si;
+    si.dwFlags = STARTF_USESTDHANDLES;
+    si.hStdOutput = owr;
+    si.hStdError = ewr;
+    PROCESS_INFORMATION pi{};
+    BOOL ok = CreateProcessW(py.c_str(), cmd.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW | CREATE_UNICODE_ENVIRONMENT,
+                             (void*)env.c_str(), g_root.c_str(), &si, &pi);
+    CloseHandle(owr);
+    CloseHandle(ewr);
+    if (!ok) {
+        CloseHandle(ord);
+        CloseHandle(erd);
+        *why = L"Python did not start (" + py + L")";
+        return -1;
+    }
+    ReadPipe ro{ord, out, line, ctx}, re{erd, err};
+    HANDLE readers[2] = {CreateThread(nullptr, 0, read_pipe, &ro, 0, nullptr), CreateThread(nullptr, 0, read_pipe, &re, 0, nullptr)};
+    DWORD code = (DWORD)-1;
+    // Without both readers a full pipe would stop the script, and apply waits without a time limit: stop it at once.
+    if (!readers[0] || !readers[1]) { TerminateProcess(pi.hProcess, 1); *why = L"no reader thread"; }
+    else if (WaitForSingleObject(pi.hProcess, timeout_ms) == WAIT_OBJECT_0) GetExitCodeProcess(pi.hProcess, &code);
+    else { TerminateProcess(pi.hProcess, 1); *why = L"translations.py did not answer"; }
+    for (HANDLE r : readers)
+        if (r) {
+            WaitForSingleObject(r, 5000);
+            CancelSynchronousIo(r);
+            WaitForSingleObject(r, 1000);
+            CloseHandle(r);
+        }
+    CloseHandle(ord);
+    CloseHandle(erd);
+    CloseHandle(pi.hThread);
+    CloseHandle(pi.hProcess);
+    if (code == (DWORD)-1 && why->empty()) *why = L"translations.py failed";
+    return code == (DWORD)-1 ? -1 : (int)code;
+}
+
+struct LangChoice { wstring id, label, kind, note; bool available = true; LangEnv env; };
+struct LangList { bool ok = false; wstring why, installed; std::vector<LangChoice> choices; };
+
+// translations.py list for a game folder; ok = false (why) when it could not run or said nothing useful.
+static LangList lang_list(const wstring& game) {
+    LangList r;
+    std::string out, err;
+    int code = run_translations(L"list --game " + q(game), &out, &err, nullptr, nullptr, 60000, &r.why);
+    if (code < 0) return r;
+    if (code != 0) { r.why = last_line(err); if (r.why.empty()) r.why = L"translations.py failed"; return r; }
+    size_t b = out.find('{');
+    JVal v;
+    JParse jp{out.data() + (b == std::string::npos ? out.size() : b), out.data() + out.size()};
+    const JVal* ch = jp.val(v, 0) ? v.get("choices") : nullptr;
+    if (!ch || ch->t != JVal::ARR) { r.why = L"translations.py printed no list"; return r; }
+    r.installed = jstr(v.get("installed"));
+    for (const JVal& c : ch->items) {
+        LangChoice l;
+        l.id = jstr(c.get("id"));
+        if (l.id.empty()) continue;
+        l.label = jstr(c.get("label"));
+        if (l.label.empty()) l.label = l.id;
+        l.kind = jstr(c.get("kind"));
+        l.note = jstr(c.get("note"));
+        const JVal* a = c.get("available");
+        l.available = !a || a->t != JVal::BOOL || a->b;
+        if (const JVal* e = c.get("env"))
+            for (size_t i = 0; e->t == JVal::OBJ && i < e->keys.size(); ++i)
+                if (e->items[i].t == JVal::STR) l.env.emplace_back(widen(e->keys[i]), widen(e->items[i].s));
+        r.choices.push_back(std::move(l));
+    }
+    r.ok = !r.choices.empty();
+    if (!r.ok) r.why = L"translations.py listed no language";
+    return r;
+}
+
+// Before a start: makes the game folder match the chosen language and gives its environment. A choice this folder
+// does not have (Arabic on the European disc, ...) plays in English. A translation that is not installed, or an
+// installed one when the choice is something else, runs translations.py apply first (about two minutes to install
+// Arabic, its progress through line). No list (no Python, ...) plays as the folder is: English is never blocked.
+// False = apply failed (err: its reason); the game must not start then.
+static bool lang_prepare(const wstring& game, const wstring& want, void (*line)(const std::string&, void*), void* ctx,
+                         LangEnv* env, wstring* err, bool* applied = nullptr) {
+    env->clear();
+    if (applied) *applied = false;
+    LangList r = lang_list(game);
+    if (!r.ok) return true;
+    const LangChoice* c = nullptr;
+    for (auto& x : r.choices)
+        if (x.available && x.id == want) c = &x;
+    for (auto& x : r.choices)
+        if (!c && x.id == L"en") c = &x;
+    if (!c) c = &r.choices[0];
+    if (r.installed != c->id && (c->kind == L"translation" || !r.installed.empty())) {
+        std::string out, er;
+        wstring why;
+        int code = run_translations(L"apply " + q(c->id) + L" --game " + q(game), &out, &er, line, ctx, INFINITE, &why);
+        if (applied) *applied = true;
+        if (code != 0) {
+            *err = code < 0 ? why : last_line(er);
+            if (err->empty()) *err = L"translations.py apply " + c->id + L" failed.";
+            // The installer prints its own error on stdout ("the messages above say why"): give its last line too.
+            wstring said = last_line(out);
+            if (code > 0 && !said.empty() && said != *err) *err += L"\n\nLast message: " + said;
+            return false;
+        }
+    }
+    *env = c->env;
+    return true;
+}
+
+// The window's Language list: filled from translations.py list on a thread (it takes a moment) at start and whenever
+// the Game choice changes the folder. Picking a choice saves its id; one this folder cannot have stays in the list
+// with its note but cannot be picked.
+static std::vector<LangChoice> g_langs;   // the list's items, in order
+static wstring g_lang_installed;          // the translation installed in that folder ("" = none)
+static int g_lang_gen;                    // the newest list asked for; older answers are dropped
+struct LangListJob { wstring game; int gen; LangList list; };
+static DWORD WINAPI lang_list_thread(void* p) {
+    LangListJob* j = (LangListJob*)p;
+    j->list = lang_list(j->game);
+    if (!PostMessageW(g_wnd, WM_LANG_LIST, 0, (LPARAM)j)) delete j;
+    return 0;
+}
+static void lang_fill(const LangList& l) {
+    g_langs = l.choices;
+    g_lang_installed = l.installed;
+    g_lang_note = l.ok ? L"" : L"Language: English only (" + l.why + L")";
+    if (!l.ok) {
+        LangChoice en;
+        en.id = L"en";
+        en.label = L"English";
+        en.kind = L"original";
+        g_langs = {en};
+    }
+    HWND c = item(ID_LANG);
+    SendMessageW(c, CB_RESETCONTENT, 0, 0);
+    int sel = 0;
+    for (size_t i = 0; i < g_langs.size(); ++i) {
+        const LangChoice& x = g_langs[i];
+        wstring t = x.available || x.note.empty() ? x.label : x.label + L"  -  " + x.note;
+        SendMessageW(c, CB_ADDSTRING, 0, (LPARAM)t.c_str());
+        if (x.available && x.id == g_set.lang) sel = (int)i;
+    }
+    SendMessageW(c, CB_SETCURSEL, sel, 0);
+    update_status();
+}
+static void lang_refresh() {
+    int g = 0;
+    for (int i = 0; i < GAME_COUNT; ++i)
+        if (checked(ID_GAME0 + i)) g = i;
+    LangListJob* j = new LangListJob{game_dir(g), ++g_lang_gen, {}};
+    HANDLE t = CreateThread(nullptr, 0, lang_list_thread, j, 0, nullptr);
+    if (t) { CloseHandle(t); return; }
+    j->list.why = L"no thread";
+    lang_fill(j->list);
+    delete j;
+}
+static void on_lang_picked() {
+    int i = (int)SendMessageW(item(ID_LANG), CB_GETCURSEL, 0, 0);
+    if (i < 0 || i >= (int)g_langs.size()) return;
+    const LangChoice& c = g_langs[i];
+    if (!c.available) {   // back to the saved choice (or English), and say why
+        int sel = 0;
+        for (size_t k = 0; k < g_langs.size(); ++k)
+            if (g_langs[k].available && g_langs[k].id == g_set.lang) sel = (int)k;
+        SendMessageW(item(ID_LANG), CB_SETCURSEL, sel, 0);
+        SetWindowTextW(item(ID_STATUS), (c.label + L": " + c.note + L".").c_str());
+        return;
+    }
+    g_set.lang = c.id;
+    update_status();
+    if (c.kind == L"translation" && c.id != g_lang_installed)
+        SetWindowTextW(item(ID_STATUS), (c.label + L" is put into your game files when you press PLAY (about two "
+                                         L"minutes the first time; the original files are kept).").c_str());
+}
+
+// Play: the language on a thread (an install takes minutes; the window stays usable and shows its progress), then
+// play_with on WM_LANG_DONE.
+struct LangPlayJob { wstring game, want; LangEnv env; wstring err; bool ok = false, applied = false; };
+static void lang_post_line(const std::string& l, void*) {
+    if (l.empty()) return;
+    wstring* w = new wstring(widen(l));
+    if (!PostMessageW(g_wnd, WM_LANG_LINE, 0, (LPARAM)w)) delete w;
+}
+static DWORD WINAPI lang_play_thread(void* p) {
+    LangPlayJob* j = (LangPlayJob*)p;
+    j->ok = lang_prepare(j->game, j->want, lang_post_line, nullptr, &j->env, &j->err, &j->applied);
+    if (!PostMessageW(g_wnd, WM_LANG_DONE, 0, (LPARAM)j)) delete j;
+    return 0;
+}
+static void lang_then_play() {
+    LangPlayJob* j = new LangPlayJob;
+    j->game = game_dir(g_set.game);
+    j->want = g_set.lang;
+    HANDLE t = CreateThread(nullptr, 0, lang_play_thread, j, 0, nullptr);
+    if (!t) { delete j; play_with(LangEnv()); return; }
+    CloseHandle(t);
+    g_lang_busy = true;
+    g_lang_line.clear();
+    EnableWindow(item(ID_PLAY), FALSE);
+    EnableWindow(item(ID_UPDATE), FALSE);
+    SetWindowTextW(item(ID_PLAY), L"Getting ready...");
+    update_status();
+}
+static void on_lang_done(LangPlayJob* j) {
+    g_lang_busy = false;
+    EnableWindow(item(ID_PLAY), TRUE);
+    EnableWindow(item(ID_UPDATE), !g_checking);
+    SetWindowTextW(item(ID_PLAY), L"PLAY");
+    if (j->applied) lang_refresh();   // what is installed now
+    update_status();
+    if (j->ok) play_with(j->env);
+    else MessageBoxW(g_wnd, (L"Could not change the game's language, so the game was not started:\n\n" + j->err).c_str(),
+                     L"Language", MB_ICONWARNING);
+}
+
+// --play has no window: progress goes to a console (the one it was started from, else a new one), opened only when
+// there is something to install or remove.
+static HANDLE g_con;
+static void lang_console_line(const std::string& l, void*) {
+    if (!g_con) {
+        if (!AttachConsole(ATTACH_PARENT_PROCESS)) AllocConsole();
+        g_con = CreateFileW(L"CONOUT$", GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr);
+    }
+    wstring w = widen(l) + L"\r\n";
+    DWORD n;
+    if (g_con != INVALID_HANDLE_VALUE) WriteConsoleW(g_con, w.c_str(), (DWORD)w.size(), &n, nullptr);
 }
 
 // ---- the Controls window (fix 103) -----------------------------------------------------------------------
@@ -1267,6 +1674,12 @@ static void create_controls() {
             L"what you lost). The timer shows it when it is not 1x, for videos and runs.");
     for (const wchar_t* t : {L"1x (the game's own)", L"2x", L"3x", L"5x", L"10x"})
         SendMessageW(c, CB_ADDSTRING, 0, (LPARAM)t);
+    y += 30;
+    label(L"Language", L, y + 3, 92);
+    add(WC_COMBOBOXW, nullptr, CBS_DROPDOWNLIST | WS_TABSTOP | WS_VSCROLL, ID_LANG, X, y, 240, 200,
+        L"The game's language. English; on the European disc also its French, German, Spanish and Italian; and "
+        L"translations made by players (translations folder), which PLAY puts into your game files the first time "
+        L"(the original files are kept and go back when you pick another language).");
     y += 34;
 
     const int C2 = L + W / 2;
@@ -1335,7 +1748,7 @@ static void create_controls() {
     label(L"", L, y, W, 20, ID_STATUS);
 }
 
-static int client_h() { return 12 + banner_h() + 10 + 28 + 40 + 28 + 32 + 30 + 34 + 26 * 6 + 34 + 36 + 54 + 36 + 20 + 12; }
+static int client_h() { return 12 + banner_h() + 10 + 28 + 40 + 28 + 32 + 30 + 30 + 34 + 26 * 6 + 34 + 36 + 54 + 36 + 20 + 12; }
 
 static LRESULT CALLBACK wndproc(HWND w, UINT m, WPARAM wp, LPARAM lp) {
     switch (m) {
@@ -1344,6 +1757,7 @@ static LRESULT CALLBACK wndproc(HWND w, UINT m, WPARAM wp, LPARAM lp) {
         create_controls();
         write_controls();
         update_status();
+        lang_refresh();
         // Players rarely press Check for updates: a copy without git asks GitHub's releases once at start, in
         // the background, and a newer one shows in the status line (no message box; offline = nothing).
         if (!exists(at(L".git")) && exists(venv_python()) && exists(at(L"setup\\update.py"))) {
@@ -1370,8 +1784,10 @@ static LRESULT CALLBACK wndproc(HWND w, UINT m, WPARAM wp, LPARAM lp) {
             }
         } else if (id == ID_CUSTOM && code == EN_CHANGE && !g_loading) update_fps_hint();
         else if (id == ID_VRR && code == BN_CLICKED) update_fps_hint();
-        else if (id >= ID_GAME0 && id <= ID_GAME3 && code == BN_CLICKED)
+        else if (id >= ID_GAME0 && id <= ID_GAME3 && code == BN_CLICKED) {
             EnableWindow(item(ID_BRSOULS), checked(ID_GAME3));
+            lang_refresh();   // another folder can have other languages (fix 162)
+        } else if (id == ID_LANG && code == CBN_SELCHANGE) on_lang_picked();
         else if (id == ID_RES && code == CBN_SELCHANGE)
             EnableWindow(item(ID_SHADOW), SendMessageW(item(ID_RES), CB_GETCURSEL, 0, 0) > 0);
         return 0;
@@ -1386,6 +1802,25 @@ static LRESULT CALLBACK wndproc(HWND w, UINT m, WPARAM wp, LPARAM lp) {
         ShowWindow(w, SW_RESTORE);
         SetForegroundWindow(w);
         if (wp != 0) show_crash(w, (DWORD)wp);
+        return 0;
+    }
+    case WM_LANG_LIST: {
+        LangListJob* j = (LangListJob*)lp;
+        if (j->gen == g_lang_gen) lang_fill(j->list);
+        delete j;
+        return 0;
+    }
+    case WM_LANG_LINE: {
+        wstring* l = (wstring*)lp;
+        g_lang_line = *l;
+        delete l;
+        if (g_lang_busy) update_status();
+        return 0;
+    }
+    case WM_LANG_DONE: {
+        LangPlayJob* j = (LangPlayJob*)lp;
+        on_lang_done(j);
+        delete j;
         return 0;
     }
     case WM_UPDATE_CHECKED: {
@@ -1422,6 +1857,11 @@ static LRESULT CALLBACK wndproc(HWND w, UINT m, WPARAM wp, LPARAM lp) {
         return 0;
     }
     case WM_CLOSE:
+        if (g_lang_busy) {   // an install cut off halfway would leave the game folder half translated
+            MessageBoxW(w, L"The game's language is being put in place (the line at the bottom shows how far). "
+                           L"Close the launcher when it is done.", L"Language", MB_ICONINFORMATION);
+            return 0;
+        }
         read_controls();
         save_settings();
         DestroyWindow(w);
@@ -1462,7 +1902,19 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, LPWSTR, int show) {
     // --play: no window, the saved settings; a crash still gets its message.
     if (play_now) {
         if (!can_play(nullptr, g_set)) return 1;
-        HANDLE h = start_game(g_set);
+        LangEnv lang;   // the language first, as Play in the window (fix 162)
+        wstring err;
+        bool ok = lang_prepare(game_dir(g_set.game), g_set.lang, lang_console_line, nullptr, &lang, &err);
+        if (g_con) {   // the console was only for the progress (the reason of a failure is in the message below)
+            if (g_con != INVALID_HANDLE_VALUE) CloseHandle(g_con);
+            FreeConsole();
+        }
+        if (!ok) {
+            MessageBoxW(nullptr, (L"Could not change the game's language, so the game was not started:\n\n" + err).c_str(),
+                        L"Demon's Souls", MB_ICONWARNING);
+            return 1;
+        }
+        HANDLE h = start_game(g_set, &lang);
         if (!h) return 1;
         WaitForSingleObject(h, INFINITE);
         DWORD code = 0;

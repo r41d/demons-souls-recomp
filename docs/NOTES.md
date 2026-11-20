@@ -4113,6 +4113,10 @@ Don't run ps3recomp tools with `-P`/`-I`: they import sibling modules from their
       plays there); NPC talk boxes and blood messages on screen. Still English: pictures with text (NOW LOADING,
       YOU DIED, area titles), the HUD's L / R hand labels (drawn by code), and the help line's alignment (placed by
       code).
+    - Later the same day: the HUD's L / R hand labels are 19x19 sprites in menu.tpf "Menu08" ((79,404) and
+      (102,404)), now drawn as يس / يم (make_ar_hud.py; reviewer Dr Cage). The HUD's item and magic names
+      (menu.drb Text shapes 1983 / 1984: boxes that start at their slot and run 280 px right) stay left-aligned;
+      right-aligned, the name ended up far from its slot.
 
 161. **The mouse cursor hides during play when it is not moving (2026-11-20, RTX 3070 PC, Linux via Proton):**
     - Request (a player): hide the mouse during normal gameplay. The cursor was already hidden while the mouse is
@@ -4126,6 +4130,25 @@ Don't run ps3recomp tools with `-P`/`-I`: they import sibling modules from their
     - Checked (sandbox, US disc, Proton): build, then boot -> profile -> tutorial -> inventory / system / options
       menus, same screens as before. Not checked: the cursor itself (the sandbox has no real mouse or screen to look
       at), native Windows, and the native Linux / macOS builds (their own SDL / Cocoa windows, unchanged).
+
+162. **A Language setting in the launchers, for the European disc's languages and custom translations (2026-11-20, RTX 3070 PC, Linux):**
+    - translations/translations.py is the one place that knows the languages: `list --game <folder>` gives JSON
+      (the disc, the translation installed, and the choices: English; on the European disc French, German, Spanish
+      and Italian, which only set PS3_LANG; every translations/<name>/ with a translation.json for this disc), and
+      `apply <id> --game <folder>` installs or removes translation files so the folder matches (one translation at a
+      time; the originals come back on removal). A new translation is a folder with translation.json and an
+      installer taking --game / --uninstall.
+    - Windows launcher (launcher.cpp) and native Linux launcher (linux/native/launcher.py): a Language dropdown
+      (saved as language=<id>), filled from `list` in the background for the game folder Play uses (boss rush:
+      game). On Play, and with --play, `apply` runs first when the choice needs files installed or removed, with its
+      progress in the status line and Play disabled; the game starts only if it succeeds. The choice's env
+      (PS3_LANG) is added before Extra settings, which still win. Without Python or the script the list is English
+      only and play is never blocked.
+    - Checked: translations.py on sandbox copies (list on the US and European folders; apply ar, then apply en
+      restoring the game byte for byte; Arabic refused on the European disc); the Windows launcher compiled with
+      clang-cl + xwin (/W4, no new warnings) and its JSON parser tested on the real output; the Linux launcher's
+      helpers tested headless. Not checked: either window opened (no Windows or display here), a real install from
+      a launcher, the macOS launcher (not changed; it can call the same script).
 
 209. **Native Linux / macOS: Storm King beach missing rocks -- fix 64 again, in the draw engine (2026-11-16, user report
     after a full boss rush on the Steam Deck: "missing level geometry in the storm king fight")**

@@ -48,6 +48,7 @@ ELF = os.path.join(ROOT, 'game', 'PS3_GAME', 'USRDIR', 'EBOOT.elf')
 CONF_DIR = os.path.join(os.environ.get('XDG_CONFIG_HOME') or os.path.expanduser('~/.config'), 'demons-souls-recomp')
 CONF = os.path.join(CONF_DIR, 'linux-launcher.json')
 LOGS = os.path.join(ROOT, 'logs')
+TRANSLATIONS = os.path.join(ROOT, 'translations', 'translations.py')
 BUILD_LOG = os.path.join(LOGS, 'native_build.txt')
 
 
@@ -73,6 +74,7 @@ DEFAULTS = {
     'god': False,
     'gpu_clock': '800',        # Steam Deck: MHz or auto
     'lto': False,
+    'language': 'en',          # an id from translations/translations.py list (en, fr, ar, ...)
 }
 STEPS = ['deps', 'venv', 'game', 'decrypt', 'toolkit', 'lift', 'build']
 
@@ -95,9 +97,68 @@ def save_conf(c):
     os.replace(tmp, CONF)
 
 
-def play_env(c):
+def lang_game(c):
+    """The game folder the language applies to: the one play.sh plays (boss rush is made from game/)."""
+    return os.path.join(ROOT, 'game_remaster' if c['game'] == 'game_remaster' else 'game')
+
+
+def lang_python():
+    """The repo's venv Python runs translations.py (the installers need its packages); this one if there is none."""
+    py = os.path.join(ROOT, '.venv', 'bin', 'python')
+    return py if os.access(py, os.X_OK) else (sys.executable or 'python3')
+
+
+def lang_list(game):
+    """translations.py list for this game folder: (its JSON, None), or (None, why) when it cannot run."""
+    try:
+        r = subprocess.run([lang_python(), TRANSLATIONS, 'list', '--game', game], cwd=ROOT,
+                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60)
+    except (OSError, subprocess.SubprocessError) as e:
+        return None, 'Language list unavailable (%s): English only.' % e
+    out = r.stdout.decode('utf-8', 'replace').strip().splitlines()
+    try:
+        if r.returncode != 0:
+            raise ValueError
+        data = json.loads(out[-1])
+        data['choices'][0]
+        return data, None
+    except (ValueError, IndexError, KeyError, TypeError):
+        why = (r.stderr.decode('utf-8', 'replace').strip().splitlines() or ['exit code %d' % r.returncode])[-1]
+        return None, 'Language list unavailable (%s): English only.' % why
+
+
+ENGLISH = {'id': 'en', 'label': 'English', 'kind': 'original', 'env': {}, 'available': True, 'note': ''}
+
+
+def lang_choice(data, lang):
+    """The choice to play with: the saved one when this game folder has it, otherwise English (an Arabic setting
+    on the European disc plays in English, and the setting stays for the disc it is for)."""
+    for ch in (data or {}).get('choices', []):
+        if ch['id'] == lang and ch.get('available'):
+            return ch
+    return ENGLISH
+
+
+def lang_needs_apply(data, ch):
+    """True when translations.py apply has to run before playing: the choice is a translation not installed yet,
+    or a translation is installed and the choice is something else."""
+    if not data:
+        return False
+    inst = data.get('installed')
+    return (ch['kind'] == 'translation' and inst != ch['id']) or (inst is not None and inst != ch['id'])
+
+
+def lang_apply_argv(ch, game):
+    return [lang_python(), TRANSLATIONS, 'apply', ch['id'], '--game', game]
+
+
+def play_env(c, lang_env=None):
     """The environment play.sh gets for these settings (the launcher's own process environment plus these)."""
     e = dict(os.environ)
+    # The language's variables (PS3_LANG=fr for the European disc's French; NOTES fix 162). One the player set in
+    # the environment themselves keeps priority, as typed extra settings do in the other launchers.
+    for k, val in (lang_env or {}).items():
+        e.setdefault(k, val)
     e['DES_FPS'] = c['fps']
     e['DES_NAME'] = c['name'] or 'Slayer'
     e['DES_FULLSCREEN'] = '1' if c['fullscreen'] else '0'
@@ -125,7 +186,22 @@ def play_now(c):
     if not os.access(EXE, os.X_OK):
         print('The native build is not there yet: run linux/native/install.sh first.')
         return 1
-    return subprocess.call(['bash', PLAY], cwd=ROOT, env=play_env(c))
+    # The language first (NOTES fix 162): install or remove a translation when the setting asks for it, and play
+    # only when that worked. When translations.py cannot run, the game plays in English.
+    game = lang_game(c)
+    data, why = lang_list(game)
+    if why:
+        print(why, flush=True)
+    ch = lang_choice(data, c['language'])
+    if lang_needs_apply(data, ch):
+        p = subprocess.Popen(lang_apply_argv(ch, game), cwd=ROOT, stdout=subprocess.PIPE,
+                             stderr=subprocess.STDOUT, text=True, encoding='utf-8', errors='replace', bufsize=1)
+        for line in p.stdout:
+            print(line.rstrip(), flush=True)
+        if p.wait() != 0:
+            print('The language could not be set (the line above says why); the game was not started.')
+            return 1
+    return subprocess.call(['bash', PLAY], cwd=ROOT, env=play_env(c, ch['env']))
 
 
 class Gamepads:
@@ -331,6 +407,7 @@ def main_window(steam=False):
         'god': tk.BooleanVar(value=conf['god']),
         'gpu_clock': tk.StringVar(value=conf['gpu_clock']),
         'lto': tk.BooleanVar(value=conf['lto']),
+        'language': tk.StringVar(value=conf['language']),
     }
     row = 0
     ttk.Label(opts, text='Frame rate').grid(row=row, column=0, sticky='w', pady=2)
@@ -344,6 +421,55 @@ def main_window(steam=False):
     gr.grid(row=row, column=1, sticky='w')
     for val, txt in (('game', 'Normal'), ('game_remaster', 'PC Remaster'), ('bossrush', 'Boss rush')):
         ttk.Radiobutton(gr, text=txt, value=val, variable=v['game']).pack(side='left', padx=(0, 10))
+    row += 1
+    # Language (NOTES fix 162): the choices translations.py lists for the game folder Play uses. The setting keeps
+    # the id; the box shows the labels. Choices this disc does not have are left out and named on the right.
+    ttk.Label(opts, text='Language').grid(row=row, column=0, sticky='w', pady=2)
+    lr = ttk.Frame(opts)
+    lr.grid(row=row, column=1, sticky='w')
+    lang_label = tk.StringVar()
+    lang_box = ttk.Combobox(lr, textvariable=lang_label, width=22, state='readonly')
+    lang_box.pack(side='left')
+    lang_hint = ttk.Label(lr, foreground='#555')
+    lang_hint.pack(side='left', padx=(8, 0))
+    lang = {'game': None, 'data': None, 'why': None}
+
+    def lang_show():
+        data = lang['data']
+        shown = [ch for ch in (data or {'choices': [ENGLISH]})['choices'] if ch.get('available')]
+        lang_box.configure(values=[ch['label'] for ch in shown])
+        ch = lang_choice(data, v['language'].get())
+        lang_label.set(ch['label'])
+        hint = [ch['note']] if ch['note'] else []
+        hint += ['%s: %s' % (x['label'], x['note']) for x in (data or {}).get('choices', []) if not x.get('available')]
+        lang_hint.configure(text='; '.join(hint))
+
+    def lang_picked(_e=None):
+        data = lang['data']
+        for ch in (data or {'choices': [ENGLISH]})['choices']:
+            if ch['label'] == lang_label.get() and ch.get('available'):
+                v['language'].set(ch['id'])
+        lang_show()
+    lang_box.bind('<<ComboboxSelected>>', lang_picked)
+
+    def lang_load(*_):
+        """Lists the choices for the game folder Play uses, off the Tk thread (it runs a Python)."""
+        game = lang_game({'game': v['game'].get()})
+
+        def work():
+            data, why = lang_list(game)
+            root.after(0, got, data, why)
+
+        def got(data, why):
+            if game != lang_game({'game': v['game'].get()}):
+                return      # the Game choice changed meanwhile: its own listing follows
+            changed = why != lang['why']
+            lang.update(game=game, data=data, why=why)
+            lang_show()
+            if changed and not busy():
+                refresh()   # only for the reason in the status line: a failed apply's message stays there
+        threading.Thread(target=work, daemon=True).start()
+    v['game'].trace_add('write', lang_load)
     row += 1
     ttk.Label(opts, text='Boss rush souls').grid(row=row, column=0, sticky='w', pady=2)
     ttk.Combobox(opts, textvariable=v['br_souls'], values=('1', '2', '3', '5', '10'), width=5,
@@ -437,12 +563,15 @@ def main_window(steam=False):
                 status.set('The game files are there, the compile is not: Rebuild finishes it.')
             else:
                 status.set('Not installed yet: Install... opens the installer.')
+            if lang['why']:
+                status.set(status.get() + ' ' + lang['why'])
 
     def run(kind, argv, env, on_line=None, on_done=None):
         os.makedirs(LOGS, exist_ok=True)
         log('\n$ ' + ' '.join(shlex.quote(a) for a in argv) + '\n')
         p = subprocess.Popen(argv, cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                             text=True, bufsize=1, start_new_session=True)
+                             text=True, encoding='utf-8', errors='replace',   # language labels are not ASCII
+                             bufsize=1, start_new_session=True)
         state['proc'], state['kind'] = p, kind
         refresh()
 
@@ -478,6 +607,38 @@ def main_window(steam=False):
             return
         if not os.access(EXE, os.X_OK):
             return open_installer()
+        c = current()
+        game = lang_game(c)
+        if lang['game'] != game:    # not listed yet for this folder (rare: the listing runs at start)
+            data, why = lang_list(game)
+            lang.update(game=game, data=data, why=why)
+            lang_show()
+        ch = lang_choice(lang['data'], c['language'])
+        if lang_needs_apply(lang['data'], ch):
+            # Install (or remove) the translation first, in the log, and play only when it worked (NOTES fix 162).
+            status.set('Setting the language to %s...' % ch['label'])
+            last = {'line': ''}
+
+            def lang_line(line):
+                if line.strip():
+                    last['line'] = line.strip()
+                    status.set(last['line'])
+
+            def lang_done(code):
+                lang_load()     # what is installed now
+                if code == 0:
+                    start(c, ch)
+                else:
+                    if not last['line']:
+                        last['line'] = 'stopped (exit code %d)' % code   # Stop, or no reason printed
+                    status.set('The language could not be set: ' + last['line'])
+                    messagebox.showerror('Demon\'s Souls', 'The language could not be set, so the game was not '
+                                         'started:\n\n%s\n\n(The log below has the details.)' % last['line'])
+            run('lang', lang_apply_argv(ch, game), dict(os.environ), on_line=lang_line, on_done=lang_done)
+            return
+        start(c, ch)
+
+    def start(c, ch):
         status.set('Playing. The logos and the first load take about a minute.')
 
         def done(code):
@@ -489,7 +650,7 @@ def main_window(steam=False):
                     open_path(LOGS)
             elif steam:
                 root.destroy()      # from Steam: the game ended, so does the "game" Steam started
-        run('play', ['bash', PLAY], play_env(current()), on_done=done)
+        run('play', ['bash', PLAY], play_env(c, ch['env']), on_done=done)
 
     def build_line(line):
         if line.startswith('==> '):
@@ -601,8 +762,9 @@ def main_window(steam=False):
     b_stop.configure(command=do_stop)
 
     def on_close():
-        if busy() and state['kind'] == 'build':
-            if not messagebox.askyesno('Demon\'s Souls', 'A build is running. Stop it and quit?'):
+        if busy() and state['kind'] in ('build', 'lang'):
+            what = 'A build is running' if state['kind'] == 'build' else 'The language is being installed'
+            if not messagebox.askyesno('Demon\'s Souls', what + '. Stop it and quit?'):
                 return
             do_stop()
         root.destroy()
@@ -800,6 +962,8 @@ def main_window(steam=False):
         root.bind_class(cls, '<KP_Enter>', key('a'))
 
     refresh()
+    lang_show()
+    lang_load()
     # Fit the screen (a Steam Deck is 800 px tall): the log is what gives way.
     root.update_idletasks()
     h = min(root.winfo_reqheight(), root.winfo_screenheight() - 60)

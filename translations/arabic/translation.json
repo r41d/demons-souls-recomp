@@ -1,0 +1,9 @@
+{
+ "id": "ar",
+ "name": "Arabic",
+ "native": "العربية",
+ "disc": "US",
+ "installer": "install_arabic.py",
+ "backup": "arabic_backup",
+ "needs": "Community translation. The title movie needs ffmpeg."
+}

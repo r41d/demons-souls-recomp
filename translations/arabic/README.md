@@ -1,6 +1,7 @@
 # Arabic translation (USA disc, BLUS-30443)
 
-Install / uninstall: see the main README ("Arabic translation"). This folder holds only our own work: the Arabic
+Install / uninstall: the launcher's Language setting, or `translations/translations.py apply ar` / `apply en`; see
+the main README ("Arabic translation"). This folder holds only our own work: the Arabic
 text, the tools, two OFL fonts and the logo picture. Everything the game needs is built from the player's own game
 files when `install_arabic.py` runs. **Never commit game files or the game's English text here.**
 
@@ -11,16 +12,17 @@ files when `install_arabic.py` runs. **Never commit game files or the game's Eng
 | `ar_text.json` | The translation: `{menu|item: {FMG id: {string id: Arabic}}}`, logical order. Reviewed by native speakers. Items left out stay English. |
 | `arshape.py` | Arabic shaping into presentation forms (U+FE70-FEFF), lam-alef, bidi to visual order, and line wrapping. The game draws code points left to right with no shaping, so text is stored shaped and in visual order. |
 | `make_ar_font.py` | Draws the Arabic letter forms (Noto Sans Arabic) into dsfont24 / talkfont24 and points 0-9 at Arabic-Indic digits. Only changed BC3 blocks are re-encoded. |
-| `drb_rtl.py`, `drbparse.py` | Right-aligns the menu text boxes in `MENU/menu.drb`, and points the options "HUD" label at a new Arabic string. The file never grows: a larger `menu.drb` made the game stall at boot. |
+| `drb_rtl.py`, `drbparse.py` | Right-aligns the menu text boxes in `MENU/menu.drb` (not the stat labels, and not the HUD's item / magic names, whose wide boxes start at their slot), and points the options "HUD" label at a new Arabic string. The file never grows: a larger `menu.drb` made the game stall at boot. |
 | `make_ar_title.py`, `title_logo_ar.png` | The title logo: `title_logo_ar.png` (by MrSuS60, made with Gemini; fitted into the original logo's area, 1280x720 grey on black), split into the two sprites of the `Title` texture in `MENU/menu.tpf` (BC1). The title movie is drawn from the same picture. |
 | `logo_art.py`, `logo_cuts.json` | The earlier generated logo (Noto Naskh Arabic, chiselled, with editable cuts), kept as a fallback: it is used only when `title_logo_ar.png` is missing. |
+| `make_ar_hud.py` | The HUD's hand labels: "L" / "R" are 19x19 sprites in the `Menu08` texture of `MENU/menu.tpf`; they are redrawn as يس / يم (left / right, as the reviewers asked) in the same cream on the dark box. |
+| `translation.json` | What the launchers' Language setting needs to know about this translation (see `translations/translations.py`). |
 | `make_ar_title_movie.py` | `MOVIE/ds_title.pam`, the logo forming out of smoke. The original's smoke is the English logo's own shape, so the effect is redrawn from the Arabic logo on the original's timeline, then encoded with ffmpeg (MPEG-2, same settings) and written into the original file's video packets. The header and the audio stay byte for byte. |
 | `fmg.py`, `ccm.py`, `make_font.py` | FMG text, CCM font and BC3 helpers. |
 | `fonts/` | Noto Sans Arabic and Noto Naskh Arabic, SIL Open Font License 1.1 (`fonts/OFL.txt`). |
 
 What stays English:
 - pictures with text (NOW LOADING, YOU DIED, area titles);
-- the L / R hand labels, which game code draws;
 - the alignment of the button help line, which game code places.
 
 See docs/NOTES.md fix 160.
