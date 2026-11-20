@@ -222,6 +222,8 @@ Keyboard + mouse work alongside a controller; whichever you touch last takes ove
 | Alt+Enter / F11 | borderless fullscreen |
 | F9 | god mode (no death, HP/MP/stamina stay full) |
 
+- **The cursor** hides over the game after 2 s without moving during play (not in menus); moving the mouse shows it
+  again. `DES_CURSOR_IDLE_MS=<ms>` changes the delay, `0` keeps it visible.
 - **Menus:** the mouse is a pointer. Hover selects, left click confirms, right click goes back, the wheel
   scrolls, and side buttons or PageUp / PageDown are L1 / R1. `DES_POINT=0` turns pointing off;
   `PAD_MENU_MOUSE=0` turns the mouse off in menus.

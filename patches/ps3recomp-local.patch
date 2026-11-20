@@ -5684,7 +5684,7 @@ index 0000000..d9edd4d
 +
 +#endif /* PS3RECOMP_VDEC_MF_H */
 diff --git a/libs/input/cellPad.c b/libs/input/cellPad.c
-index afdd93de..ae56704e 100644
+index afdd93de..0338fd7b 100644
 --- a/libs/input/cellPad.c
 +++ b/libs/input/cellPad.c
 @@ -9,6 +9,23 @@
@@ -5976,7 +5976,7 @@ index afdd93de..ae56704e 100644
      HWND fg = GetForegroundWindow();
      if (!fg) return 0;
      DWORD pid = 0;
-@@ -277,23 +442,711 @@ static int pad_host_window_focused(void)
+@@ -277,23 +442,714 @@ static int pad_host_window_focused(void)
      return pid == GetCurrentProcessId();
  }
  
@@ -6297,6 +6297,9 @@ index afdd93de..ae56704e 100644
 +static volatile LONG s_menu_mask;     /* the game's menu bitmask (game thread) */
 +static volatile LONG s_wheel_acc;     /* wheel delta not yet used (WHEEL_DELTA = 120 per notch) */
 +static volatile LONG s_pad_reports;   /* fresh reports handed to the game on port 0 (wheel pulse timing) */
++/* A game menu is open (the same gate as the menu mouse above); the window's idle-cursor hiding stays off in menus
++ * (rsx_null_backend.c, Demon's Souls NOTES fix 161). */
++int ps3_host_menu_open(void) { return ((unsigned)s_menu_mask & DES_MENU_GATE) != 0; }
 +void ps3_host_menu_state(unsigned mask)
 +{
 +    static int log = -1;
@@ -6701,7 +6704,7 @@ index afdd93de..ae56704e 100644
      static const struct { int vk; u16 btn; } map[] = {
          { VK_UP,     CELL_PAD_CTRL_UP },      { VK_DOWN,  CELL_PAD_CTRL_DOWN },
          { VK_LEFT,   CELL_PAD_CTRL_LEFT },    { VK_RIGHT, CELL_PAD_CTRL_RIGHT },
-@@ -306,7 +1159,7 @@ static void pad_poll_keyboard(void)
+@@ -306,7 +1162,7 @@ static void pad_poll_keyboard(void)
  
      u16 btns = 0;
      for (unsigned i = 0; i < sizeof map / sizeof map[0]; i++)
@@ -6710,7 +6713,7 @@ index afdd93de..ae56704e 100644
  
      hs->buttons   = btns;
      hs->connected = 1;
-@@ -317,10 +1170,100 @@ static void pad_poll_keyboard(void)
+@@ -317,10 +1173,100 @@ static void pad_poll_keyboard(void)
      hs->analog_rx = hs->analog_ry = 128;
      hs->trigger_l2 = (u8)((btns & CELL_PAD_CTRL_L2) ? 255 : 0);
      hs->trigger_r2 = (u8)((btns & CELL_PAD_CTRL_R2) ? 255 : 0);
@@ -6813,7 +6816,7 @@ index afdd93de..ae56704e 100644
            fflush(stdout); } }
  }
  #endif
-@@ -334,28 +1277,44 @@ static void pad_poll_keyboard(void)
+@@ -334,28 +1280,44 @@ static void pad_poll_keyboard(void)
  #define PAD_EMPTY_RECHECK_MS 1000
  static unsigned long long s_pad_empty_until[PAD_MAX_HOST_PORTS];
  
@@ -6864,7 +6867,7 @@ index afdd93de..ae56704e 100644
          XINPUT_GAMEPAD* gp = &state.Gamepad;
  
          /* Map XInput buttons to PS3 CELL_PAD_CTRL_* */
-@@ -377,33 +1336,57 @@ static void pad_poll_xinput(void)
+@@ -377,33 +1339,57 @@ static void pad_poll_xinput(void)
          if (gp->wButtons & XINPUT_GAMEPAD_A)              btns |= CELL_PAD_CTRL_CROSS;
          if (gp->wButtons & XINPUT_GAMEPAD_X)              btns |= CELL_PAD_CTRL_SQUARE;
  
@@ -6943,7 +6946,7 @@ index afdd93de..ae56704e 100644
  }
  
  static void pad_init_backend(void)
-@@ -443,12 +1426,34 @@ static u8 pad_sdl_trigger_to_u8(int raw)
+@@ -443,12 +1429,34 @@ static u8 pad_sdl_trigger_to_u8(int raw)
      return (u8)val;
  }
  
@@ -6979,7 +6982,7 @@ index afdd93de..ae56704e 100644
      const int on = r->lo || r->hi;
      SDL_GameControllerRumble(gc, r->lo, r->hi, on ? PAD_RUMBLE_HOLD_MS : 0);
      r->sent_ms = on ? pad_now_ms() : 0;
-@@ -541,6 +1546,14 @@ static void pad_sdl_hotplug(int force)
+@@ -541,6 +1549,14 @@ static void pad_sdl_hotplug(int force)
      int got;
      /* SDL_JOYAXISMOTION (0x600) up to the touch events (0x700): every
       * joystick and game controller event, which only this file uses. */
@@ -6994,7 +6997,7 @@ index afdd93de..ae56704e 100644
      while ((got = SDL_PeepEvents(ev, 32, SDL_GETEVENT, SDL_JOYAXISMOTION, SDL_JOYAXISMOTION + 0xFF)) > 0)
          for (int i = 0; i < got; i++)
              if (ev[i].type == SDL_JOYDEVICEADDED || ev[i].type == SDL_JOYDEVICEREMOVED ||
-@@ -562,9 +1575,14 @@ static void pad_sdl_hotplug(int force)
+@@ -562,9 +1578,14 @@ static void pad_sdl_hotplug(int force)
  
  static void pad_poll_sdl2(void)
  {
@@ -7009,7 +7012,7 @@ index afdd93de..ae56704e 100644
      for (int i = 0; i < PAD_MAX_HOST_PORTS; i++) {
          SDL_GameController* gc = s_sdl_controllers[i];
          if (!gc) {
-@@ -575,43 +1593,59 @@ static void pad_poll_sdl2(void)
+@@ -575,43 +1596,59 @@ static void pad_poll_sdl2(void)
  
          s_host_state[i].connected = 1;
  
@@ -7098,7 +7101,7 @@ index afdd93de..ae56704e 100644
  
          /* Pressure: SDL has digital buttons, so 0 or 255 */
          s_host_state[i].press_up       = (btns & CELL_PAD_CTRL_UP)       ? 255 : 0;
-@@ -629,6 +1663,7 @@ static void pad_poll_sdl2(void)
+@@ -629,6 +1666,7 @@ static void pad_poll_sdl2(void)
  
  static void pad_init_backend(void)
  {
@@ -7106,7 +7109,7 @@ index afdd93de..ae56704e 100644
      if (!s_sdl_inited) {
          if (SDL_WasInit(SDL_INIT_GAMECONTROLLER) == 0) {
              /* The game is not always the focused app: on macOS its window
-@@ -643,6 +1678,17 @@ static void pad_init_backend(void)
+@@ -643,6 +1681,17 @@ static void pad_init_backend(void)
               * cared. SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS=0 in the
               * environment still wins over this. */
              SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
@@ -7124,7 +7127,7 @@ index afdd93de..ae56704e 100644
              SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER);
          }
          s_sdl_inited = 1;
-@@ -650,6 +1696,11 @@ static void pad_init_backend(void)
+@@ -650,6 +1699,11 @@ static void pad_init_backend(void)
      memset(s_sdl_controllers, 0, sizeof(s_sdl_controllers));
      for (int p = 0; p < PAD_MAX_HOST_PORTS; p++) s_sdl_ids[p] = -1;
  
@@ -7136,7 +7139,7 @@ index afdd93de..ae56704e 100644
      /* Open any controllers already connected */
      pad_sdl_hotplug(1);
  }
-@@ -684,7 +1735,13 @@ static void pad_shutdown_backend(void)
+@@ -684,7 +1738,13 @@ static void pad_shutdown_backend(void)
  static unsigned long long pad_now_ms(void)
  {
  #ifdef _WIN32
@@ -7151,7 +7154,7 @@ index afdd93de..ae56704e 100644
  #else
      struct timespec ts;
      clock_gettime(CLOCK_MONOTONIC, &ts);
-@@ -693,6 +1750,516 @@ static unsigned long long pad_now_ms(void)
+@@ -693,6 +1753,516 @@ static unsigned long long pad_now_ms(void)
  #endif
  }
  
@@ -7668,7 +7671,7 @@ index afdd93de..ae56704e 100644
  static void pad_poll_backend(void)
  {
      static unsigned long long s_last_ms = 0;
-@@ -706,17 +2273,68 @@ static void pad_poll_backend(void)
+@@ -706,17 +2276,68 @@ static void pad_poll_backend(void)
      for (int _i = 0; _i < PAD_MAX_HOST_PORTS; _i++) s_data_fresh[_i] = 1;
  
  #if PAD_BACKEND_XINPUT
@@ -7739,7 +7742,7 @@ index afdd93de..ae56704e 100644
  /* ---------------------------------------------------------------------------
   * API implementations
   * -----------------------------------------------------------------------*/
-@@ -735,6 +2353,7 @@ s32 cellPadInit(u32 max_connect)
+@@ -735,6 +2356,7 @@ s32 cellPadInit(u32 max_connect)
      if (max_connect == 0 || max_connect > 127)
          return CELL_PAD_ERROR_INVALID_PARAMETER;
  
@@ -7747,7 +7750,7 @@ index afdd93de..ae56704e 100644
      s_pad_initialized = 1;
      s_max_connect = max_connect > CELL_PAD_MAX_PORT_NUM ? CELL_PAD_MAX_PORT_NUM : max_connect;
      memset(s_port_setting, 0, sizeof(s_port_setting));
-@@ -742,7 +2361,9 @@ s32 cellPadInit(u32 max_connect)
+@@ -742,7 +2364,9 @@ s32 cellPadInit(u32 max_connect)
          pad_host_release(&s_host_state[i]);
  
      pad_lock();
@@ -7757,7 +7760,7 @@ index afdd93de..ae56704e 100644
      pad_unlock();
  
      /* Do an initial poll to detect connected controllers */
-@@ -765,7 +2386,9 @@ s32 cellPadEnd(void)
+@@ -765,7 +2389,9 @@ s32 cellPadEnd(void)
          return CELL_PAD_ERROR_NOT_OPENED;
  
      pad_lock();
@@ -7767,7 +7770,7 @@ index afdd93de..ae56704e 100644
      pad_unlock();
  
      s_pad_initialized = 0;
-@@ -865,6 +2488,7 @@ skip_inject: ;
+@@ -865,6 +2491,7 @@ skip_inject: ;
          len = CELL_PAD_LEN_CHANGE_PRESS_ON;
  
      data->len = len;
@@ -7775,7 +7778,7 @@ index afdd93de..ae56704e 100644
      /* Finalize this call's packet freshness before any injected hold budget
       * advances. len=0 drain reads still build the ordinary payload, but do
       * not consume a PAD_FILE report. See the emission contract below. */
-@@ -875,6 +2499,20 @@ skip_inject: ;
+@@ -875,6 +2502,20 @@ skip_inject: ;
              if (!s_data_fresh[port_no]) data->len = 0;   /* nothing new: end the drain */
              else                        s_data_fresh[port_no] = 0;
          }
@@ -7796,7 +7799,7 @@ index afdd93de..ae56704e 100644
      }
      /* button[0] is reserved and 0 on hardware; button[1] carries the pad mode
       * in its high nibble (0x7) and len/2 in its low one. GH3 drops any packet
-@@ -947,13 +2585,33 @@ skip_inject: ;
+@@ -947,13 +2588,33 @@ skip_inject: ;
                    held[i]--;
                    data->button[CELL_PAD_BTN_OFFSET_DIGITAL1] |= (u16)(ev[i].mask & 0xFF);
                    data->button[CELL_PAD_BTN_OFFSET_DIGITAL2] |= (u16)((ev[i].mask >> 8) & 0xFF);
@@ -7832,7 +7835,7 @@ index afdd93de..ae56704e 100644
      /* PAD_FILE=<path> -- closed-loop input. Each poll, if the file holds a
       * button mask (same encoding as PAD_SCRIPT), press it for a fixed number
       * of positive guest reports and empty the file on admission. A driver
-@@ -967,6 +2625,7 @@ skip_inject: ;
+@@ -967,6 +2628,7 @@ skip_inject: ;
       *   echo 0x0040 4 > pad.txt  # DOWN for 4 reports (menus auto-repeat a
       *                            # long hold; the default is 40)
       */
@@ -7840,7 +7843,7 @@ index afdd93de..ae56704e 100644
      { static int s_pf = -1; static char pf_path[512];
        static unsigned held_mask = 0; static int held_n = 0;
        if (s_pf < 0) { const char* e = getenv("PAD_FILE");
-@@ -978,11 +2637,25 @@ skip_inject: ;
+@@ -978,11 +2640,25 @@ skip_inject: ;
                if (f) {
                    char buf[64]; buf[0] = 0;
                    if (fgets(buf, sizeof buf, f)) {
@@ -7871,7 +7874,7 @@ index afdd93de..ae56704e 100644
                    }
                    fclose(f);
                    if (held_n > 0) { FILE* w = fopen(pf_path, "wb"); if (w) fclose(w); }
-@@ -1015,6 +2688,30 @@ skip_inject: ;
+@@ -1015,6 +2691,30 @@ skip_inject: ;
        if (s_st && pad_clock(s_t0) >= s_from && pad_clock(s_t0) < s_until) { hs->analog_lx = s_v[0]; hs->analog_ly = s_v[1];
                    hs->analog_rx = s_v[2]; hs->analog_ry = s_v[3];
                    hs->connected = 1; }
@@ -7902,7 +7905,7 @@ index afdd93de..ae56704e 100644
        /* PAD_SWEEP=<seconds per step>: walk the sticks through a fixed set of
         * deflections instead of holding one. Guessing a single stick position and
         * re-running costs ~5 minutes a try; a sweep answers "can input move the
-@@ -1042,8 +2739,16 @@ skip_inject: ;
+@@ -1042,8 +2742,16 @@ skip_inject: ;
                  fprintf(stderr, "[PADSWEEP] step %d: l=(%u,%u) r=(%u,%u)%c", k,
                          steps[k][0], steps[k][1], steps[k][2], steps[k][3], 10); } }
          } } }
@@ -7921,7 +7924,7 @@ index afdd93de..ae56704e 100644
      data->button[CELL_PAD_BTN_OFFSET_ANALOG_LEFT_X]  = hs->analog_lx;
      data->button[CELL_PAD_BTN_OFFSET_ANALOG_LEFT_Y]  = hs->analog_ly;
  
-@@ -1122,6 +2827,21 @@ emit:
+@@ -1122,6 +2830,21 @@ emit:
       * PAD_ALWAYS_CHANGE=1 restores the old always-a-packet behaviour. */
      {
          unsigned int ea = (unsigned int)(uintptr_t)data_guest;
@@ -7943,7 +7946,7 @@ index afdd93de..ae56704e 100644
          vm_write32((unsigned long long)ea + 0, (unsigned int)data->len);   /* len (s32) */
          for (int _i = 0; _i < CELL_PAD_MAX_CODES; _i++)                    /* button[] u16 */
              vm_write16((unsigned long long)ea + 4 + (unsigned int)_i * 2, data->button[_i]);
-@@ -1395,31 +3115,42 @@ s32 cellPadSetActDirect(u32 port_no, CellPadActParam* param)
+@@ -1395,31 +3118,42 @@ s32 cellPadSetActDirect(u32 port_no, CellPadActParam* param)
  
      param = GUEST_PTR(param, CellPadActParam*);
  
@@ -24300,7 +24303,7 @@ index ad8db0b5..fda600ed 100644
  #endif
      return atomic_load(&s_closed) ? -1 : 0;
 diff --git a/libs/video/rsx_null_backend.c b/libs/video/rsx_null_backend.c
-index 32e8a95..c139297 100644
+index 32e8a959..bf37322a 100644
 --- a/libs/video/rsx_null_backend.c
 +++ b/libs/video/rsx_null_backend.c
 @@ -9,6 +9,7 @@
@@ -24345,7 +24348,7 @@ index 32e8a95..c139297 100644
  /* ---------------------------------------------------------------------------
   * Internal state
   * -----------------------------------------------------------------------*/
-@@ -52,18 +80,34 @@ static NullBackendState s_state;
+@@ -52,18 +80,80 @@ static NullBackendState s_state;
  
  static int s_present_suppressed = 0;
  
@@ -24354,9 +24357,55 @@ index 32e8a95..c139297 100644
 +#ifndef WM_DPICHANGED
 +#define WM_DPICHANGED 0x02E0
 +#endif
++/* Idle cursor (Demon's Souls NOTES fix 161): during play -- the mouse not captured, no game menu open, the game
++ * window in front -- the cursor over the game hides after DES_CURSOR_IDLE_MS (default 2000, 0 = never) without
++ * moving, so it no longer sits in the middle of the picture when playing on a pad. Any movement shows it again,
++ * and so does a menu opening (menus use the pointer, fix 93). A 250 ms window timer does the check. */
++#define NULL_CURSOR_TIMER 0x4443u
++static ULONGLONG s_cur_moved;        /* last real mouse movement over the window */
++static LPARAM    s_cur_last = -1;    /* its client position (WM_MOUSEMOVE also comes without a move) */
++static int       s_cur_hidden;
++static int null_cursor_idle_ms(void)
++{
++    static int v = -1;
++    if (v < 0) { const char* e = getenv("DES_CURSOR_IDLE_MS"); v = (e && *e) ? atoi(e) : 2000; if (v < 0) v = 0; }
++    return v;
++}
++static void null_cursor_show(void)
++{
++    if (!s_cur_hidden) return;
++    s_cur_hidden = 0;
++    SetCursor(LoadCursor(NULL, IDC_ARROW));
++}
++static void null_cursor_tick(HWND hwnd)
++{
++    extern int ps3_host_mouse_captured(void);
++    extern int ps3_host_menu_open(void);
++    const int ms = null_cursor_idle_ms();
++    if (s_cur_hidden) {
++        if (ps3_host_menu_open()) null_cursor_show();
++        return;
++    }
++    if (!ms || ps3_host_mouse_captured() || ps3_host_menu_open() || GetForegroundWindow() != hwnd) return;
++    if (GetTickCount64() - s_cur_moved < (ULONGLONG)ms) return;
++    POINT p; RECT rc;
++    if (!GetCursorPos(&p) || WindowFromPoint(p) != hwnd) return;
++    ScreenToClient(hwnd, &p);
++    GetClientRect(hwnd, &rc);
++    if (!PtInRect(&rc, p)) return;
++    s_cur_hidden = 1;
++    SetCursor(NULL);
++}
++
  static LRESULT CALLBACK null_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
  {
      switch (msg) {
++    case WM_TIMER:
++        if (wp == NULL_CURSOR_TIMER) { null_cursor_tick(hwnd); return 0; }
++        break;
++    case WM_MOUSEMOVE:
++        if (lp != s_cur_last) { s_cur_last = lp; s_cur_moved = GetTickCount64(); null_cursor_show(); }
++        break;
      case WM_CLOSE:
          s_state.window_closed = 1;
 +        rsx_window_closing();
@@ -24381,7 +24430,7 @@ index 32e8a95..c139297 100644
      case WM_PAINT: {
          PAINTSTRUCT ps;
          HDC hdc = BeginPaint(hwnd, &ps);
-@@ -92,10 +136,43 @@ static LRESULT CALLBACK null_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
+@@ -92,10 +182,43 @@ static LRESULT CALLBACK null_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
          return 0;
      }
  
@@ -24400,9 +24449,9 @@ index 32e8a95..c139297 100644
 +        }
 +        break;   /* DefWindowProc does the cleanup */
 +    }
-+    case WM_SETCURSOR: {   /* captured: no cursor over the game */
++    case WM_SETCURSOR: {   /* captured, or idle during play (fix 161): no cursor over the game */
 +        extern int ps3_host_mouse_captured(void);
-+        if (LOWORD(lp) == HTCLIENT && ps3_host_mouse_captured()) { SetCursor(NULL); return TRUE; }
++        if (LOWORD(lp) == HTCLIENT && (ps3_host_mouse_captured() || s_cur_hidden)) { SetCursor(NULL); return TRUE; }
 +        break;
 +    }
 +    case WM_SYSKEYDOWN:   /* Alt+Enter: borderless fullscreen on/off (Demon's Souls NOTES fix 69) */
@@ -24427,7 +24476,7 @@ index 32e8a95..c139297 100644
          }
          return 0;
      }
-@@ -103,6 +180,38 @@ static LRESULT CALLBACK null_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
+@@ -103,6 +226,38 @@ static LRESULT CALLBACK null_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
      return DefWindowProcA(hwnd, msg, wp, lp);
  }
  
@@ -24466,7 +24515,7 @@ index 32e8a95..c139297 100644
  /* ---------------------------------------------------------------------------
   * Backend callbacks
   * -----------------------------------------------------------------------*/
-@@ -236,6 +345,27 @@ int rsx_null_backend_init(u32 width, u32 height, const char* title)
+@@ -236,6 +391,27 @@ int rsx_null_backend_init(u32 width, u32 height, const char* title)
      s_state.height = height;
      s_state.clear_color = RGB(0, 0, 64); /* dark blue default */
  
@@ -24494,7 +24543,7 @@ index 32e8a95..c139297 100644
      /* Register window class */
      WNDCLASSEXA wc = {0};
      wc.cbSize = sizeof(wc);
-@@ -264,6 +394,11 @@ int rsx_null_backend_init(u32 width, u32 height, const char* title)
+@@ -264,6 +440,13 @@ int rsx_null_backend_init(u32 width, u32 height, const char* title)
          return -1;
      }
  
@@ -24503,10 +24552,12 @@ index 32e8a95..c139297 100644
 +    { RAWINPUTDEVICE rid = { 0x01, 0x02, 0, s_state.hwnd };   /* mouse, while the window has focus (fix 78) */
 +      if (!RegisterRawInputDevices(&rid, 1, sizeof rid))
 +          printf("[RSX null] raw mouse input unavailable (%lu): cursor-delta fallback\n", GetLastError()); }
++    s_cur_moved = GetTickCount64();
++    SetTimer(s_state.hwnd, NULL_CURSOR_TIMER, 250, NULL);   /* idle cursor (fix 161) */
      s_state.hdc = GetDC(s_state.hwnd);
      s_state.last_fps_time = GetTickCount64();
      snprintf(s_state.title, sizeof(s_state.title), "%s", title ? title : "ps3recomp");
-@@ -297,12 +432,21 @@ void rsx_null_backend_shutdown(void)
+@@ -297,12 +480,21 @@ void rsx_null_backend_shutdown(void)
  int rsx_null_backend_pump_messages(void)
  {
      MSG msg;
@@ -24528,7 +24579,7 @@ index 32e8a95..c139297 100644
      /* RPCS3-style caption, once a second: guest FPS (flips), draws in the last
       * live-draw frame, window size. Here on the window's own thread, so the
       * WM_SETTEXT never blocks the renderer. */
-@@ -310,6 +454,7 @@ int rsx_null_backend_pump_messages(void)
+@@ -310,6 +502,7 @@ int rsx_null_backend_pump_messages(void)
      if (s_state.hwnd && now - s_state.title_time >= 1000) {
          extern u32 rsx_live_draw_get_last_draws(void);
          extern double rsx_live_draw_get_present_fps(void);
@@ -24536,7 +24587,7 @@ index 32e8a95..c139297 100644
          /* Live draw owns presentation (and end_frame never runs) when enabled. */
          double fps = rsx_live_draw_get_present_fps();
          if (fps <= 0.0)
-@@ -318,6 +463,12 @@ int rsx_null_backend_pump_messages(void)
+@@ -318,6 +511,12 @@ int rsx_null_backend_pump_messages(void)
          char tb[256];
          snprintf(tb, sizeof(tb), "%s | FPS: %.2f | draws: %u | %ux%u", s_state.title, fps,
                   rsx_live_draw_get_last_draws(), s_state.width, s_state.height);
@@ -24549,7 +24600,7 @@ index 32e8a95..c139297 100644
          SetWindowTextA(s_state.hwnd, tb);
          s_state.title_frames = s_state.frame_count;
          s_state.title_time = now;
-@@ -386,8 +537,18 @@ typedef struct {
+@@ -386,8 +585,18 @@ typedef struct {
  
  static NullSoftState s_soft;
  
@@ -24568,7 +24619,7 @@ index 32e8a95..c139297 100644
      (void)ud; (void)stencil;                      /* no stencil buffer here */
      s_soft.clear_argb = color;
      /* CLEAR_SURFACE bits: 0x01 depth, 0x02 stencil, 0xF0 the four colour
-@@ -456,7 +617,7 @@ static u32 colour_of(const float c[4])
+@@ -456,7 +665,7 @@ static u32 colour_of(const float c[4])
  static void nullsw_bind_texture(void* ud, u32 unit, const rsx_texture_state* t)
  {
      (void)ud;
@@ -24577,7 +24628,7 @@ index 32e8a95..c139297 100644
  
      /* CONTROL0 bit 31 is the unit enable. A disabled unit unbinds. */
      if (!(t->control0 & 0x80000000u) || !t->offset) { s_soft.tex_ready = 0; return; }
-@@ -601,6 +762,7 @@ static void draw_prim(u32 prim, u32 first, u32 count)
+@@ -601,6 +810,7 @@ static void draw_prim(u32 prim, u32 first, u32 count)
  {
      const rsx_state* st = s_soft.state;
      if (!st || !s_soft.fb || count < 3) return;

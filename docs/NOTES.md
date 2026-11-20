@@ -4114,6 +4114,19 @@ Don't run ps3recomp tools with `-P`/`-I`: they import sibling modules from their
       YOU DIED, area titles), the HUD's L / R hand labels (drawn by code), and the help line's alignment (placed by
       code).
 
+161. **The mouse cursor hides during play when it is not moving (2026-11-20, RTX 3070 PC, Linux via Proton):**
+    - Request (a player): hide the mouse during normal gameplay. The cursor was already hidden while the mouse is
+      captured for the camera (fix 78), but playing on a pad, or before the first click, the arrow sat over the
+      picture.
+    - rsx_null_backend.c (the game's window): a 250 ms window timer hides the cursor over the game after
+      DES_CURSOR_IDLE_MS (default 2000; 0 = never) without moving, while the mouse is not captured, no game menu is
+      open (cellPad.c ps3_host_menu_open: the menu-mouse gate of fix 89) and the game window is in front. Any real
+      mouse movement shows it again (WM_MOUSEMOVE with a new position), and so does a menu opening, since menus use
+      the pointer (fix 93). WM_SETCURSOR keeps it hidden while idle, as it already did while captured.
+    - Checked (sandbox, US disc, Proton): build, then boot -> profile -> tutorial -> inventory / system / options
+      menus, same screens as before. Not checked: the cursor itself (the sandbox has no real mouse or screen to look
+      at), native Windows, and the native Linux / macOS builds (their own SDL / Cocoa windows, unchanged).
+
 209. **Native Linux / macOS: Storm King beach missing rocks -- fix 64 again, in the draw engine (2026-11-16, user report
     after a full boss rush on the Steam Deck: "missing level geometry in the storm king fight")**
     - rsx_draw_engine.c (Vulkan and Metal) queued a draw's DRAW_ARRAYS / DRAW_INDEX_ARRAY packets in
