@@ -16,13 +16,14 @@ files when `install_arabic.py` runs. **Never commit game files or the game's Eng
 | `make_ar_title.py`, `title_logo_ar.png` | The title logo: `title_logo_ar.png` (by MrSuS60, made with Gemini; fitted into the original logo's area, 1280x720 grey on black), split into the two sprites of the `Title` texture in `MENU/menu.tpf` (BC1). The title movie is drawn from the same picture. |
 | `logo_art.py`, `logo_cuts.json` | The earlier generated logo (Noto Naskh Arabic, chiselled, with editable cuts), kept as a fallback: it is used only when `title_logo_ar.png` is missing. |
 | `make_ar_hud.py` | The HUD's hand labels: "L" / "R" are 19x19 sprites in the `Menu08` texture of `MENU/menu.tpf`; they are redrawn as يس / يم (left / right, as the reviewers asked) in the same cream on the dark box. |
+| `make_ar_banners.py` | The centre-screen banners (YOU DIED, YOU REVIVED, THE DEMON WAS DESTROYED, YOU REGAINED LOST SOUL, TARGET WAS DESTROYED, BLACK PHANTOM WAS DESTROYED) are pictures, textures `Menu14`-`Menu18` of `MENU/menu.tpf` (BC1); each is redrawn in Noto Naskh Arabic in the English lettering's colour, in the reviewers' wording. |
 | `translation.json` | What the launchers' Language setting needs to know about this translation (see `translations/translations.py`). |
 | `make_ar_title_movie.py` | `MOVIE/ds_title.pam`, the logo forming out of smoke. The original's smoke is the English logo's own shape, so the effect is redrawn from the Arabic logo on the original's timeline, then encoded with ffmpeg (MPEG-2, same settings) and written into the original file's video packets. The header and the audio stay byte for byte. |
 | `fmg.py`, `ccm.py`, `make_font.py` | FMG text, CCM font and BC3 helpers. |
 | `fonts/` | Noto Sans Arabic and Noto Naskh Arabic, SIL Open Font License 1.1 (`fonts/OFL.txt`). |
 
 What stays English:
-- pictures with text (NOW LOADING, YOU DIED, area titles);
+- pictures with text (NOW LOADING, area titles);
 - the alignment of the button help line, which game code places.
 
 See docs/NOTES.md fix 160.

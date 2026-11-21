@@ -6,7 +6,7 @@
   FONT/NA_ENGLISH/{dsfont24,talkfont24}.{ccm,tpf}[.dcx]   fonts with the Arabic letter forms added
   MSG/NA_ENGLISH/{menu,item}.msgbnd[.dcx]                 all game text from ar_text.json
   MENU/menu.drb                                           menu layout with the text right-aligned (drb_rtl.py)
-  MENU/menu.tpf[.dcx]                                     the title logo and HUD hand labels in Arabic
+  MENU/menu.tpf[.dcx]                                     the title logo, HUD labels and banners in Arabic
   MOVIE/ds_title.pam                                      the title movie with the Arabic logo (needs ffmpeg)
 Numbers are shown in Arabic-Indic digits (the fonts draw 0-9 as U+0660-U+0669); --latin-digits keeps 0-9.
 ar_menu.json holds normal (logical-order) Arabic. Each line is shaped into presentation forms and put in
@@ -178,8 +178,10 @@ def layout(usrdir, out):
     make_ar_title.build(tmp, tmp + '.ar')
     import make_ar_hud               # the HUD's L / R hand labels as يس / يم (make_ar_hud.py)
     make_ar_hud.build(tmp + '.ar', tmp + '.ar')
+    import make_ar_banners           # YOU DIED and the other centre-screen banners (make_ar_banners.py)
+    make_ar_banners.build(tmp + '.ar', tmp + '.ar')
     save(os.path.join(out, 'MENU', 'menu.tpf'), open(tmp + '.ar', 'rb').read(), src + '.dcx')
-    print('menu.tpf: title logo and HUD hand labels in Arabic')
+    print('menu.tpf: title logo, HUD hand labels and banners (YOU DIED ...) in Arabic')
     # the title movie (the logo forming out of smoke) remade for the Arabic logo; needs ffmpeg (make_ar_title_movie.py)
     import shutil as _sh
     if _sh.which('ffmpeg'):
