@@ -4117,6 +4117,17 @@ Don't run ps3recomp tools with `-P`/`-I`: they import sibling modules from their
       (102,404)), now drawn as يس / يم (make_ar_hud.py; reviewer Dr Cage). The HUD's item and magic names
       (menu.drb Text shapes 1983 / 1984: boxes that start at their slot and run 280 px right) stay left-aligned;
       right-aligned, the name ended up far from its slot.
+    - The centre-screen banners (YOU DIED, YOU REVIVED, THE DEMON WAS DESTROYED, YOU REGAINED LOST SOUL, TARGET WAS
+      DESTROYED, BLACK PHANTOM WAS DESTROYED) are pictures: menu.tpf "Menu14"-"Menu18", 1024x128 BC1, one flat colour
+      on black. menu.drb shows Menu15 as two sprites, uv (0,0)-(440,128) YOU DIED and (440,0)-(1024,128) YOU
+      REVIVED; the others whole. make_ar_banners.py draws the reviewers' wording (Zack) in Noto Naskh Arabic in each
+      banner's colour, centred on the English and on its baseline, one size for all (the alef as tall as the
+      capitals), narrowed when too wide. "Tutorial" (area name, menu 200800) is now المرحلة التعليمية. Checked:
+      installed through translations.py on a sandbox copy, the banners decoded from the installed menu.tpf, the
+      area name on the HUD in a Proton run, `apply en` restoring the textures; every banner drawn by the game
+      (Proton sandbox, a test-only hook calling the SetTextEffect function, lua binding 0x43E4E0 -> 0x722170, with
+      types 1-7: 1 demon destroyed, 2 you died, 3 revived, 4 lost soul, 5 target destroyed, 6 phantom died (the YOU
+      DIED picture), 7 black phantom destroyed; the hook was not kept).
 
 161. **The mouse cursor hides during play when it is not moving (2026-11-20, RTX 3070 PC, Linux via Proton):**
     - Request (a player): hide the mouse during normal gameplay. The cursor was already hidden while the mouse is
