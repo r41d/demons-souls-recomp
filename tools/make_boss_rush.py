@@ -170,9 +170,19 @@ def rd(p):
         return f.read()
 
 
+def translation():
+    """The translation installed over game/ (translations/translations.py keeps the originals in game/<x>_backup with
+    an INSTALLED.txt), or None for the disc's own text. Boss rush is built on top of it, so a change rebuilds it."""
+    for d in sorted(os.listdir(GAME)) if os.path.isdir(GAME) else []:
+        if d.endswith('_backup') and os.path.isfile(os.path.join(GAME, d, 'INSTALLED.txt')):
+            return d[:-len('_backup')]
+    return None
+
+
 def stamp_text():
     h = hashlib.sha256(rd(MODULE) + rd(os.path.abspath(__file__))).hexdigest()
-    return 'built by tools/make_boss_rush.py from game/\n' + h + '\nsouls x%d\n' % soul_mult()
+    return ('built by tools/make_boss_rush.py from game/\n' + h + '\nsouls x%d\n' % soul_mult() +
+            ('translation %s\n' % translation() if translation() else ''))
 
 
 def is_current(dst):
@@ -359,6 +369,10 @@ def item_msg(raw_plain):
     bnd = sf.Bnd3(raw_plain)
     old = {fid: fmg_strings(bnd_entry(bnd, eid=fid)['data']) for fid in NEXIAL_OLD_SHA}
     for fid, sha in NEXIAL_OLD_SHA.items():
+        if translation() and old[fid].get(1033) is not None and \
+                hashlib.sha256(old[fid][1033].encode('utf-8')).hexdigest() != sha:
+            print("  item texts: %s translation installed, the Nexial Binding's texts stay as translated" % translation())
+            return raw_plain
         assert old[fid].get(1033) and hashlib.sha256(old[fid][1033].encode('utf-8')).hexdigest() == sha, \
             ('not the tested item texts (NA English)', fid)
     for fid, text in nexial_texts({k: v[1033] for k, v in old.items()}).items():
@@ -366,6 +380,7 @@ def item_msg(raw_plain):
         e['data'] = fmg_replace(e['data'], {1033: text})
         new = fmg_strings(e['data'])
         assert new[1033] == text and all(new[k] == v for k, v in old[fid].items() if k != 1033)
+    print("  item texts: the Nexial Binding's description says it keeps your souls")
     return bnd.write()
 
 
@@ -373,7 +388,10 @@ def menu_msg(raw_plain):
     bnd = sf.Bnd3(raw_plain)
     e = bnd_entry(bnd, eid=30)                     # event texts
     old = fmg_strings(e['data'])
-    assert old.get(10010710) == 'Return to the Nexus?', 'not the tested event texts (NA English)'
+    if translation():   # a translation (translations/): the same slots; the boss prompts stay English
+        assert old.get(10010710) and all(old.get(k) is None for k in TEXTS), 'not the tested event text slots'
+    else:
+        assert old.get(10010710) == 'Return to the Nexus?', 'not the tested event texts (NA English)'
     e['data'] = fmg_set(e['data'], TEXTS)
     new = fmg_strings(e['data'])
     assert all(new[k] == v for k, v in TEXTS.items()) and all(new[k] == v for k, v in old.items() if k not in TEXTS)
@@ -502,13 +520,17 @@ def talk_shop_range(src):
 # --- the folder ------------------------------------------------------------------------------------------
 
 def link_tree(src, dst):
-    for d, _, fs in os.walk(src):
+    for d, ds, fs in os.walk(src):
+        if d == src:   # a translation's backup of the original files is not part of the game
+            ds[:] = [x for x in ds if not x.endswith('_backup')]
         t = os.path.join(dst, os.path.relpath(d, src))
         os.makedirs(t, exist_ok=True)
         for f in fs:
             tp = os.path.join(t, f)
             if os.path.exists(tp):
-                continue
+                if os.path.samefile(os.path.join(d, f), tp):
+                    continue
+                os.remove(tp)   # game/ has a new file here (a translation put in or taken out): link the new one
             try:
                 os.link(os.path.join(d, f), tp)
             except OSError:
@@ -533,6 +555,9 @@ def build(dst):
     if os.path.isfile(os.path.join(dst, STAMP)):
         os.remove(os.path.join(dst, STAMP))
     print('  game_bossrush: hard links to game/ ...')
+    for x in os.listdir(dst) if os.path.isdir(dst) else []:   # an older build linked a translation's backup too
+        if x.endswith('_backup') and os.path.isdir(os.path.join(dst, x)):
+            shutil.rmtree(os.path.join(dst, x))
     link_tree(GAME, dst)
     sd = os.path.join(USR, 'SCRIPT')
     for m in SCRIPT_BUNDLES:
@@ -558,7 +583,6 @@ def build(dst):
     put(dst, irel + '.dcx', sf.dcx_compress(new, info))
     if os.path.isfile(os.path.join(GAME, irel)):
         put(dst, irel, new)
-    print("  item texts: the Nexial Binding's description says it keeps your souls")
     prel = os.path.join(USR, 'PARAM', 'GAMEPARAM', 'gameparamna.parambnd')
     plain, info = sf.dcx_decompress(rd(os.path.join(GAME, prel + '.dcx')))
     new = shops(plain)
