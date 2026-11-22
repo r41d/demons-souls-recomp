@@ -1743,16 +1743,15 @@ static void create_controls() {
     y += 34;
 
     // QoL fixes: options that change how the original game plays (off by default), kept apart from the rest.
-    add(WC_BUTTONW, L"QoL Fixes (these change the original game)", BS_GROUPBOX, ID_QOL, L, y, W, 80);
-    add(WC_BUTTONW, L"Easy mode at start (F7)", BS_AUTOCHECKBOX | WS_TABSTOP | WS_GROUP, ID_EASY, L + 10, y + 22, 200, 22,
+    add(WC_BUTTONW, L"QoL Fixes (these change the original game)", BS_GROUPBOX, ID_QOL, L, y, W, 54);
+    add(WC_BUTTONW, L"Easy mode at start (F7)", BS_AUTOCHECKBOX | WS_TABSTOP | WS_GROUP, ID_EASY, L + 10, y + 22, 176, 22,
         L"Attacks that hit you take half as much HP. Falls, lava and poison may still do full damage. "
         L"F7 turns it on and off in the game (Windows); with god mode also on, god mode wins.");
-    add(WC_BUTTONW, L"Locked-on rolls follow the stick (OmniRoll mod)", BS_AUTOCHECKBOX | WS_TABSTOP, ID_OMNIROLL, L + 10, y + 48,
-        360, 22,
+    add(WC_BUTTONW, L"OmniRoll: rolls follow the stick", BS_AUTOCHECKBOX | WS_TABSTOP, ID_OMNIROLL, L + 196, y + 22, 222, 22,
         L"Locked on, you roll exactly where the stick points instead of in one of 4 directions; unlocked diagonal "
         L"rolls no longer go the mirrored way. Stamina, i-frames and roll speed stay the game's own. "
         L"\"Omnidirectional Roll\" by hamzafallahi (Nexus Mods, Demon's Souls mod 192), built into the port.");
-    y += 88;
+    y += 62;
 
     label(L"Extra settings", L, y + 3, 92);
     add(WC_EDITW, nullptr, WS_BORDER | WS_TABSTOP | ES_AUTOHSCROLL, ID_EXTRA, X, y, W - (X - L), 22,
@@ -1777,7 +1776,7 @@ static void create_controls() {
     label(L"", L, y, W, 20, ID_STATUS);
 }
 
-static int client_h() { return 12 + banner_h() + 10 + 28 + 40 + 28 + 32 + 30 + 30 + 34 + 26 * 6 + 34 + 88 + 36 + 54 + 36 + 20 + 12; }
+static int client_h() { return 12 + banner_h() + 10 + 28 + 40 + 28 + 32 + 30 + 30 + 34 + 26 * 6 + 34 + 62 + 36 + 54 + 36 + 20 + 12; }
 
 static LRESULT CALLBACK wndproc(HWND w, UINT m, WPARAM wp, LPARAM lp) {
     switch (m) {

@@ -89,7 +89,7 @@ mac/play.sh
 ```
 
 The launcher is the Mac counterpart of the Windows one (`mac/launcher_native/`, plain AppKit): frame rate,
-window size, internal resolution, which copy of the game (Boss rush too), movies, god mode, Easy mode, skip the intro, input, the character name, extra
+window size, internal resolution, which copy of the game (Boss rush too), movies, god mode, Easy mode and OmniRoll (under QoL Fixes), skip the intro, input, the character name, extra
 `NAME=value` settings, PLAY, and the same four buttons (check for updates, report a problem, controls,
 folders). It keeps the choices in `launcher.ini` in the port's folder, in the Windows launcher's format, and
 starts `mac/play.sh` with them. Its Controls window changes the keyboard and mouse keys; the game's button

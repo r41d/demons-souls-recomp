@@ -651,7 +651,8 @@ enum { K_SLOT = 1000 };   // a Controls slot button's tag: K_SLOT + action * 2 +
     y += 34;
 
     // QoL fixes: options that change how the original game plays (off by default), kept apart from the rest.
-    [self label:@"QoL Fixes (these change the original game)" x:L y:y w:W h:20 in:v];
+    [self label:@"QoL Fixes (these change the original game)" x:L y:y w:W h:20 in:v].font =
+        [NSFont boldSystemFontOfSize:NSFont.systemFontSize];
     y += 24;
     _easy = [self check:@"Easy mode at start" x:L + 10 y:y w:300
                     tip:@"Attacks that hit you take half as much HP. Falls, lava and poison may still do full damage. "
