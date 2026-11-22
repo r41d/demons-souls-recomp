@@ -73,6 +73,7 @@ struct Settings {
     bool no_rebuild = false;  // DES_NO_REBUILD: after an update, play the build there is
     bool skip_intro = false;  // DES_SKIP_INTRO: straight to PRESS START
     bool omniroll = false;    // DES_OMNIROLL: locked-on rolls follow the stick (the OmniRoll mod, NOTES fix 165)
+    bool mana = false;        // DES_MANA_REGEN: the player gets MP back over time (QoL Fixes)
     bool vrr = false;         // DES_VRR: a G-Sync / FreeSync screen (vsync off may tear, 60 fps vsync off)
     int br_souls = 2;         // DES_BR_SOULS: boss rush souls multiplier (BR_SOULS_CHOICES); 2x unless chosen
     bool gpu_warm = false;    // LD_GPU_WARM=2: GPU power smoothing (NOTES fix 203); other levels by hand
@@ -188,6 +189,7 @@ static void load_settings() {
     s.no_rebuild = ini_int(L"no_rebuild", s.no_rebuild) != 0;
     s.skip_intro = ini_int(L"skip_intro", s.skip_intro) != 0;
     s.omniroll = ini_int(L"omniroll", s.omniroll) != 0;
+    s.mana = ini_int(L"mana_regen", s.mana) != 0;
     s.vrr = ini_int(L"vrr", s.vrr) != 0;
     s.br_souls = std::clamp(ini_int(L"boss_rush_souls", s.br_souls), 1, 100);
     wchar_t buf[2048];
@@ -220,6 +222,7 @@ static void save_settings() {
     ini_put(L"no_rebuild", s.no_rebuild);
     ini_put(L"skip_intro", s.skip_intro);
     ini_put(L"omniroll", s.omniroll);
+    ini_put(L"mana_regen", s.mana);
     ini_put(L"vrr", s.vrr);
     ini_put(L"boss_rush_souls", s.br_souls);
     ini_put(L"gpu_smoothing", s.gpu_warm);
@@ -321,6 +324,7 @@ static wstring game_env(const Settings& s, const LangEnv* lang) {
     envif(L"DES_NO_REBUILD", s.no_rebuild, L"1");
     envif(L"DES_SKIP_INTRO", s.skip_intro, L"1");
     envif(L"DES_OMNIROLL", s.omniroll, L"1");
+    envif(L"DES_MANA_REGEN", s.mana, L"1");
     envif(L"DES_VRR", s.vrr, L"1");
     envif(L"LD_GPU_WARM", s.gpu_warm, L"2");
     env(L"PS3_LANG", nullptr);   // English unless the language choice says otherwise (fix 162)
@@ -447,7 +451,7 @@ static HANDLE start_game(const Settings& s, const LangEnv* lang) {
 enum {
     ID_PLAY = IDOK, ID_FPS = 100, ID_CUSTOM, ID_FPS_HINT, ID_RES, ID_SHADOW, ID_GAME0, ID_GAME1, ID_GAME2, ID_GAME3,
     ID_FULLSCREEN, ID_MOVIES, ID_GOD, ID_RECORD, ID_DUMP, ID_LETTER, ID_PIN, ID_NOREBUILD, ID_SKIPINTRO, ID_VRR, ID_EXTRA,
-    ID_UPDATE, ID_REPORT, ID_CONTROLS, ID_FOLDERS, ID_STATUS, ID_BRSOULS, ID_GPUWARM, ID_LANG, ID_EASY, ID_OMNIROLL, ID_QOL,
+    ID_UPDATE, ID_REPORT, ID_CONTROLS, ID_FOLDERS, ID_STATUS, ID_BRSOULS, ID_GPUWARM, ID_LANG, ID_EASY, ID_OMNIROLL, ID_QOL, ID_MANA,
     ID_F_SAVES = 200, ID_F_LOGS, ID_F_PERF, ID_F_REPLACE, ID_F_DUMP, ID_F_CAPTURES, ID_F_MODELS, ID_F_ROOT,
 };
 static const UINT WM_GAME_DONE = WM_APP + 1, WM_UPDATE_CHECKED = WM_APP + 2;
@@ -606,6 +610,7 @@ static void read_controls() {
     s.no_rebuild = checked(ID_NOREBUILD);
     s.skip_intro = checked(ID_SKIPINTRO);
     s.omniroll = checked(ID_OMNIROLL);
+    s.mana = checked(ID_MANA);
     s.vrr = checked(ID_VRR);
     {
         int i = (int)SendMessageW(item(ID_BRSOULS), CB_GETCURSEL, 0, 0);
@@ -640,6 +645,7 @@ static void write_controls() {
     check(ID_NOREBUILD, s.no_rebuild);
     check(ID_SKIPINTRO, s.skip_intro);
     check(ID_OMNIROLL, s.omniroll);
+    check(ID_MANA, s.mana);
     check(ID_VRR, s.vrr);
     {
         int sel = 0;
@@ -1748,7 +1754,7 @@ static void create_controls() {
     y += 34;
 
     // QoL fixes: options that change how the original game plays (off by default), kept apart from the rest.
-    add(WC_BUTTONW, L"QoL Fixes (these change the original game)", BS_GROUPBOX, ID_QOL, CL, y, W, 54);
+    add(WC_BUTTONW, L"QoL Fixes (these change the original game)", BS_GROUPBOX, ID_QOL, CL, y, W, 80);
     add(WC_BUTTONW, L"Easy mode at start (F7)", BS_AUTOCHECKBOX | WS_TABSTOP | WS_GROUP, ID_EASY, CL + 10, y + 22, 176, 22,
         L"Attacks that hit you take half as much HP. Falls, lava and poison may still do full damage. "
         L"F7 turns it on and off in the game (Windows); with god mode also on, god mode wins.");
@@ -1756,7 +1762,9 @@ static void create_controls() {
         L"Locked on, you roll exactly where the stick points instead of in one of 4 directions; unlocked diagonal "
         L"rolls no longer go the mirrored way. Stamina, i-frames and roll speed stay the game's own. "
         L"\"Omnidirectional Roll\" by hamzafallahi (Nexus Mods, Demon's Souls mod 192), built into the port.");
-    y += 62;
+    add(WC_BUTTONW, L"Mana regen (MP comes back over time)", BS_AUTOCHECKBOX | WS_TABSTOP, ID_MANA, CL + 10, y + 48, 300, 22,
+        L"You slowly get MP back over time (60 MP a minute of game time), like a mana-regenerating ring that is always on. DES_MANA_REGEN_RATE in Extra settings changes the rate (1-600 MP a minute).");
+    y += 88;
 
     const int yr = y;   // the right column ends here
     y = yl;
@@ -1787,7 +1795,7 @@ static void create_controls() {
 // The height create_controls() uses: banner, the taller of the two columns, PLAY, the button row, the status line.
 static int client_h() {
     const int left = 28 + 40 + 28 + 32 + 30 + 30 + 34 + 36;   // frame rate .. language, Extra settings
-    const int right = 26 * 6 + 34 + 62;                        // the switches, the QoL Fixes group
+    const int right = 26 * 6 + 34 + 88;                        // the switches, the QoL Fixes group
     return 12 + banner_h() + 10 + (left > right ? left : right) + 54 + 36 + 20 + 12;
 }
 static int client_w() { return 16 + 428 + 24 + 428 + 16; }

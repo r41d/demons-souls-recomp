@@ -89,7 +89,7 @@ mac/play.sh
 ```
 
 The launcher is the Mac counterpart of the Windows one (`mac/launcher_native/`, plain AppKit): frame rate,
-window size, internal resolution, which copy of the game (Boss rush too), movies, god mode, Easy mode and OmniRoll (under QoL Fixes), skip the intro, input, the character name, extra
+window size, internal resolution, which copy of the game (Boss rush too), movies, god mode, Easy mode, OmniRoll and mana regen (under QoL Fixes), skip the intro, input, the character name, extra
 `NAME=value` settings, PLAY, and the same four buttons (check for updates, report a problem, controls,
 folders). It keeps the choices in `launcher.ini` in the port's folder, in the Windows launcher's format, and
 starts `mac/play.sh` with them. Its Controls window changes the keyboard and mouse keys; the game's button
@@ -124,6 +124,7 @@ Settings for `mac/play.sh` on its own, as environment variables:
 | `DES_GOD=1`, `DES_SKIP_INTRO=1` | god mode from the start; straight to PRESS START |
 | `DES_EASY=1`, `DES_EASY_DAMAGE=<1-99>` | Easy mode: attacks that hit you take half as much HP (or that percent; NOTES fix 164) |
 | `DES_OMNIROLL=1` | locked-on rolls follow the stick (the OmniRoll mod, built in; NOTES fix 165) |
+| `DES_MANA_REGEN=1`, `DES_MANA_REGEN_RATE=<1-600>` | MP comes back over time (default 60 MP a minute of game time) |
 | `LD_VBLANK_LOCK=0`, `HOST_WINDOW_PACE=0` | frame pacing off: the game's clock free-running, frames shown as they come (before NOTES fix 303) |
 | `SPU_DISPQ_WAIT=0` | the SPU command dispatcher spins while idle instead of sleeping (the old behaviour; about half a core more) |
 | `RSX_ENGINE_FLOAT_DEFER=0` | the exposure read-back waits for the GPU every frame again (before NOTES fix 301), to rule it out |

@@ -1,4 +1,4 @@
-# lifted-code-eu.patch: made by tools/port_patch_eu.py from lifted-code.patch sha256 e2d30262f783fb8fa099e579fc377a98304da90f71e7a448daf8285f552985b1
+# lifted-code-eu.patch: made by tools/port_patch_eu.py from lifted-code.patch sha256 2a1ba11c3c6509859906fe12fcb141e1e8ea881e9586022065000f1018bcf6c4
 diff -ruN a/recompiled/ppu_recomp.h b/recompiled/ppu_recomp.h
 --- a/recompiled/ppu_recomp.h
 +++ b/recompiled/ppu_recomp.h
@@ -276,7 +276,7 @@ diff -ruN a/recompiled/ppu_recomp_011.cpp b/recompiled/ppu_recomp_011.cpp
  } while(0)
  
  /* Each lifted function opens with PPU_MM_SNAP; its loads and stores use that
-@@ -39841,8 +39843,482 @@
+@@ -39841,8 +39843,502 @@
          return;
  }
  
@@ -511,8 +511,12 @@ diff -ruN a/recompiled/ppu_recomp_011.cpp b/recompiled/ppu_recomp_011.cpp
 +     * While on, hits do DES_EASY_DAMAGE percent (1..99, default 50) of their HP damage to the player
 +     * (des_easy_damage above, called by the hit-damage function func_00281C70). The player's character is
 +     * kept in g_des_player_chr for it while Easy mode or god mode is on. With god mode also on, god mode wins
-+     * (HP is refilled every step anyway). */
++     * (HP is refilled every step anyway).
++     * Mana regen (PORT PATCH, QoL): DES_MANA_REGEN=1 gives the player MP back over time, DES_MANA_REGEN_RATE MP a
++     * minute of game time (1..600, default 60), counted with the game's step (0x018C8F20) so it is the same at any
++     * frame rate. Only while alive and below max MP; god mode (MP always full) wins. */
 +    { static int god = -1, clear_flag = 0, dump = -1, easy = 0, easy_pct = 50; static unsigned long long dump_t;
++      static int mana = 0, mana_rate = 60; static float mana_acc = 0.0f;
 +      if (god < 0) { const char* e = getenv("DES_GOD"); god = (e && *e == '1') ? 1 : 0;
 +                     const char* d = getenv("DES_GOD_DUMP"); dump = d ? 1 : 0;
 +                     if (god) { fprintf(stderr, "[des] god mode ON (DES_GOD)\n"); g_des_title_god = 1; des_title(); }
@@ -523,7 +527,13 @@ diff -ruN a/recompiled/ppu_recomp_011.cpp b/recompiled/ppu_recomp_011.cpp
 +                         else fprintf(stderr, "[des] DES_EASY_DAMAGE=%s ignored (1..99), using %d\n", ep, easy_pct); }
 +                     g_des_easy_pct = easy ? easy_pct : 100;
 +                     if (easy) { fprintf(stderr, "[des] easy mode ON (DES_EASY): the player takes %d%% of hit damage\n", easy_pct);
-+                                 g_des_title_easy = 1; des_title(); } }
++                                 g_des_title_easy = 1; des_title(); }
++                     const char* mr = getenv("DES_MANA_REGEN"); mana = (mr && *mr == '1') ? 1 : 0;
++                     const char* mq = getenv("DES_MANA_REGEN_RATE");
++                     if (mq && *mq) { const int r = atoi(mq);
++                         if (r >= 1 && r <= 600) mana_rate = r;
++                         else fprintf(stderr, "[des] DES_MANA_REGEN_RATE=%s ignored (1..600), using %d\n", mq, mana_rate); }
++                     if (mana) fprintf(stderr, "[des] mana regen ON (DES_MANA_REGEN): %d MP a minute\n", mana_rate); }
 +      if (ps3_host_hotkey(0x78 /* VK_F9 */)) {
 +          god = !god; if (!god) clear_flag = 1;
 +          fprintf(stderr, "[des] god mode %s (F9)\n", god ? "ON" : "OFF");
@@ -533,7 +543,7 @@ diff -ruN a/recompiled/ppu_recomp_011.cpp b/recompiled/ppu_recomp_011.cpp
 +          fprintf(stderr, "[des] easy mode %s (F7)\n", easy ? "ON" : "OFF");
 +          g_des_title_easy = easy; des_title(); }
 +      const int want_dump = dump && ps3_qpc_us() - dump_t >= 5000000ull;
-+      if (!(god || clear_flag || want_dump || easy)) g_des_player_chr = 0;
++      if (!(god || clear_flag || want_dump || easy || mana)) g_des_player_chr = 0;
 +      else {
 +          const uint32_t toc = vm_read32((uint32_t)ctx->gpr[2] - 0x7884);
 +          const uint32_t pp = toc ? vm_read32(toc - 0x7F0C) : 0;
@@ -557,6 +567,16 @@ diff -ruN a/recompiled/ppu_recomp_011.cpp b/recompiled/ppu_recomp_011.cpp
 +                  const int32_t sp = (int32_t)vm_read32(chr + 0x3D4), sp_max = (int32_t)vm_read32(chr + 0x3D8);
 +                  if (sp < sp_max) vm_write32(chr + 0x3D4, (uint32_t)sp_max);
 +              } else if (clear_flag) { vm_write64(chr + 0x310, fl & ~0x10ull); clear_flag = 0; }
++              if (mana && !god) {
++                  const int32_t hp = (int32_t)vm_read32(chr + 0x3C4);
++                  const int32_t mp = (int32_t)vm_read32(chr + 0x3CC), mp_max = (int32_t)vm_read32(chr + 0x3D0);
++                  if (hp > 0 && mp >= 0 && mp < mp_max) {
++                      const uint32_t w = vm_read32(0x018C8F20); float st; memcpy(&st, &w, 4);
++                      if (st > 0.0f && st < 0.5f) mana_acc += st * (float)mana_rate / 60.0f;
++                      if (mana_acc >= 1.0f) { const int32_t add = (int32_t)mana_acc; mana_acc -= (float)add;
++                          vm_write32(chr + 0x3CC, (uint32_t)(mp + add < mp_max ? mp + add : mp_max)); }
++                  } else mana_acc = 0.0f;
++              }
 +              if (want_dump) { dump_t = ps3_qpc_us();
 +                  fprintf(stderr, "[des] player chr %08X:", chr);
 +                  for (uint32_t o = 0x380; o < 0x480; o += 4) fprintf(stderr, "%s%03X=%d", o % 0x20 ? " " : "\n  ", o, (int32_t)vm_read32(chr + o));

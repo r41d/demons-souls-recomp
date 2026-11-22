@@ -121,7 +121,7 @@ static NSString* const INPUT_MODES[] = {@"both", @"controller", @"keyboard"};
 
 typedef struct {
     int fps, fps_custom, size, res, game, input, br_souls;
-    BOOL movies, god, easy, skip_intro, omniroll, log;
+    BOOL movies, god, easy, skip_intro, omniroll, mana, log;
 } Settings;
 static Settings g_set;
 static NSString* g_name = @"";    // DES_NAME
@@ -240,6 +240,7 @@ static void load_settings(void) {
     s->easy = ini_int(@"easy_mode", 0) != 0;
     s->skip_intro = ini_int(@"skip_intro", 0) != 0;
     s->omniroll = ini_int(@"omniroll", 0) != 0;
+    s->mana = ini_int(@"mana_regen", 0) != 0;
     s->log = ini_int(@"mac_log", 0) != 0;
     s->input = MAX(0, MIN(2, ini_int(@"mac_input", 0)));
     {   // res_q (quarters); older launchers wrote only res_scale (1-4)
@@ -274,6 +275,7 @@ static BOOL save_settings(void) {
     ini_put_int(@"easy_mode", s->easy);
     ini_put_int(@"skip_intro", s->skip_intro);
     ini_put_int(@"omniroll", s->omniroll);
+    ini_put_int(@"mana_regen", s->mana);
     ini_put_int(@"mac_log", s->log);
     ini_put_int(@"mac_input", s->input);
     ini_put(@"mac_window", SIZES[s->size]);
@@ -376,6 +378,7 @@ static NSDictionary<NSString*, NSString*>* game_env(const Settings* s) {
     if (s->easy) e[@"DES_EASY"] = @"1"; else [e removeObjectForKey:@"DES_EASY"];
     if (s->skip_intro) e[@"DES_SKIP_INTRO"] = @"1"; else [e removeObjectForKey:@"DES_SKIP_INTRO"];
     if (s->omniroll) e[@"DES_OMNIROLL"] = @"1"; else [e removeObjectForKey:@"DES_OMNIROLL"];
+    if (s->mana) e[@"DES_MANA_REGEN"] = @"1"; else [e removeObjectForKey:@"DES_MANA_REGEN"];
     if (s->log) e[@"DES_LOG"] = @"1"; else [e removeObjectForKey:@"DES_LOG"];
     e[@"PS3_INPUT_MODE"] = INPUT_MODES[s->input];
     NSString* name = [g_name stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet];
@@ -536,7 +539,7 @@ enum { K_SLOT = 1000 };   // a Controls slot button's tag: K_SLOT + action * 2 +
 @property NSPopUpButton* fps, *size, *res, *input, *brSouls;
 @property NSTextField* fpsHint, *status, *name, *extra, *keysStatus;
 @property NSMutableArray<NSButton*>* games;
-@property NSButton* movies, *god, *easy, *skipIntro, *omniroll, *log, *play, *update, *folders;
+@property NSButton* movies, *god, *easy, *skipIntro, *omniroll, *mana, *log, *play, *update, *folders;
 @property NSTask* game;
 @property BOOL checking;
 @property NSString* updateNotice;
@@ -662,6 +665,9 @@ enum { K_SLOT = 1000 };   // a Controls slot button's tag: K_SLOT + action * 2 +
                         tip:@"Locked on, you roll exactly where the stick points instead of in one of 4 directions; unlocked diagonal rolls "
                             @"no longer go the mirrored way. \"Omnidirectional Roll\" by hamzafallahi (Nexus Mods, Demon's Souls mod 192), "
                             @"built into the port." in:v];
+    y += 26;
+    _mana = [self check:@"Mana regen (MP comes back over time)" x:L + 10 y:y w:360
+                    tip:@"You slowly get MP back over time (60 MP a minute of game time), like a mana-regenerating ring that is always on. DES_MANA_REGEN_RATE in Extra settings changes the rate (1-600 MP a minute)." in:v];
     y += 34;
 
     [self label:@"Input" x:L y:y + 4 w:92 h:20 in:v];
@@ -739,6 +745,7 @@ enum { K_SLOT = 1000 };   // a Controls slot button's tag: K_SLOT + action * 2 +
     _easy.state = s->easy;
     _skipIntro.state = s->skip_intro;
     _omniroll.state = s->omniroll;
+    _mana.state = s->mana;
     _log.state = s->log;
     [_input selectItemAtIndex:s->input];
     _name.stringValue = g_name;
@@ -759,6 +766,7 @@ enum { K_SLOT = 1000 };   // a Controls slot button's tag: K_SLOT + action * 2 +
     s->easy = _easy.state == NSControlStateValueOn;
     s->skip_intro = _skipIntro.state == NSControlStateValueOn;
     s->omniroll = _omniroll.state == NSControlStateValueOn;
+    s->mana = _mana.state == NSControlStateValueOn;
     s->log = _log.state == NSControlStateValueOn;
     s->input = (int)_input.indexOfSelectedItem;
     g_name = [_name.stringValue copy];

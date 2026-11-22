@@ -72,6 +72,7 @@ DEFAULTS = {
     'async_shaders': True,     # new shaders built in the background: brief pop-in instead of a stutter
     'skip_intro': False,
     'omniroll': False,         # DES_OMNIROLL: locked-on rolls follow the stick (the OmniRoll mod, NOTES fix 165)
+    'mana': False,             # DES_MANA_REGEN: the player gets MP back over time (QoL Fixes)
     'god': False,
     'easy': False,             # DES_EASY: attacks that hit the player take half the HP (NOTES fix 164)
     'gpu_clock': '800',        # Steam Deck: MHz or auto
@@ -166,7 +167,7 @@ def play_env(c, lang_env=None):
     e['DES_FULLSCREEN'] = '1' if c['fullscreen'] else '0'
     e['DES_MOVIES'] = '1' if c['movies'] else '0'
     e['DES_ASYNC_SHADERS'] = '1' if c['async_shaders'] else '0'
-    for k in ('DES_GAME', 'DES_BOSS_RUSH', 'DES_BR_SOULS', 'DES_SKIP_INTRO', 'DES_GOD', 'DES_EASY', 'DES_OMNIROLL'):
+    for k in ('DES_GAME', 'DES_BOSS_RUSH', 'DES_BR_SOULS', 'DES_SKIP_INTRO', 'DES_GOD', 'DES_EASY', 'DES_OMNIROLL', 'DES_MANA_REGEN'):
         e.pop(k, None)
     if c['game'] == 'bossrush':
         e['DES_BOSS_RUSH'] = '1'
@@ -178,6 +179,8 @@ def play_env(c, lang_env=None):
         e['DES_SKIP_INTRO'] = '1'
     if c['omniroll']:
         e['DES_OMNIROLL'] = '1'
+    if c['mana']:
+        e['DES_MANA_REGEN'] = '1'
     if c['god']:
         e['DES_GOD'] = '1'
     if c['easy']:
@@ -411,6 +414,7 @@ def main_window(steam=False):
         'async_shaders': tk.BooleanVar(value=conf['async_shaders']),
         'skip_intro': tk.BooleanVar(value=conf['skip_intro']),
         'omniroll': tk.BooleanVar(value=conf['omniroll']),
+        'mana': tk.BooleanVar(value=conf['mana']),
         'god': tk.BooleanVar(value=conf['god']),
         'easy': tk.BooleanVar(value=conf['easy']),
         'gpu_clock': tk.StringVar(value=conf['gpu_clock']),
@@ -504,7 +508,8 @@ def main_window(steam=False):
     qol = ttk.LabelFrame(body, text='QoL Fixes (these change the original game)', padding=10)
     qol.pack(fill='x', pady=(10, 0))
     for key, txt in (('easy', 'Easy mode at start: attacks that hit you take half as much HP'),
-                     ('omniroll', 'Locked-on rolls follow the stick (the OmniRoll mod by hamzafallahi)')):
+                     ('omniroll', 'Locked-on rolls follow the stick (the OmniRoll mod by hamzafallahi)'),
+                     ('mana', 'Mana regen: MP comes back over time (60 a minute)')):
         ttk.Checkbutton(qol, text=txt, variable=v[key]).pack(anchor='w')
 
     def current():
