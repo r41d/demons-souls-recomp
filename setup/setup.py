@@ -137,6 +137,7 @@ def save_config(cfg):
 
 def run(cmd, cwd=None, log=None):
     say('  > ' + ' '.join(os.path.basename(c) if i == 0 else c for i, c in enumerate(cmd)))
+    build.cpu_ramp()   # the lift's workers start on a few cores, all of them a few seconds later
     if log:
         with open(log, 'w') as f:
             r = subprocess.run(cmd, cwd=cwd, stdout=f, stderr=subprocess.STDOUT)
@@ -691,7 +692,8 @@ def step_lift():
         os.path.join(logs, 'ppu_loader.log'))
     say('  lifting 94,000 PPU functions (about a minute or two)...')
     run([py, os.path.join(T, 'ppu_lifter.py'), 'game/EBOOT.ELF', '--functions', 'out/EBOOT.functions.json',
-         '--hle-stubs', 'out/EBOOT.imports.json', *LIFT_ARGS, '--output', 'recompiled/'], PORT,
+         '--hle-stubs', 'out/EBOOT.imports.json', *LIFT_ARGS, '--output', 'recompiled/',
+         '--jobs', str(build.default_jobs())], PORT,
         os.path.join(logs, 'ppu_lifter.log'))
     run([py, os.path.join(T, 'extract_spu_images.py'), 'game/EBOOT.ELF', '--output', 'spu/images'], PORT,
         os.path.join(logs, 'spu_extract.log'))
