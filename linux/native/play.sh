@@ -24,7 +24,7 @@
 #   DES_EASY=1           Easy mode: attacks that hit the player take half the HP (DES_EASY_DAMAGE=<1..99>
 #                        sets the percent, default 50; docs/NOTES.md fix 164)
 #   DES_OMNIROLL=1       locked-on rolls follow the stick (the OmniRoll mod, built in; docs/NOTES.md fix 165)
-#   DES_MANA_REGEN=1     the player gets MP back over time (DES_MANA_REGEN_RATE=<1..600> MP a minute, default 60)
+#   DES_MANA_REGEN=1     the player gets MP back over time (DES_MANA_REGEN_RATE=<1..600> MP a minute, default 180 = 3 a second)
 #   DES_LOG=1            the runtime's per-event log lines (PS3_VERBOSE=1); off by default, they cost frames
 #   DES_GPU_CLOCK=<MHz>|auto   Steam Deck only: pin the GPU clock for the session (default 800; see
 #                        linux/play.sh, the same helper and the same reason)

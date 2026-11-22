@@ -667,7 +667,7 @@ enum { K_SLOT = 1000 };   // a Controls slot button's tag: K_SLOT + action * 2 +
                             @"built into the port." in:v];
     y += 26;
     _mana = [self check:@"Mana regen (MP comes back over time)" x:L + 10 y:y w:360
-                    tip:@"You slowly get MP back over time (60 MP a minute of game time), like a mana-regenerating ring that is always on. DES_MANA_REGEN_RATE in Extra settings changes the rate (1-600 MP a minute)." in:v];
+                    tip:@"You slowly get MP back over time (3 MP a second of game time), like a mana-regenerating ring that is always on. DES_MANA_REGEN_RATE in Extra settings changes the rate (1-600 MP a minute)." in:v];
     y += 34;
 
     [self label:@"Input" x:L y:y + 4 w:92 h:20 in:v];

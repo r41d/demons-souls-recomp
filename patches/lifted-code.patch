@@ -510,10 +510,10 @@ diff -ruN a/recompiled/ppu_recomp_009.cpp b/recompiled/ppu_recomp_009.cpp
 +     * kept in g_des_player_chr for it while Easy mode or god mode is on. With god mode also on, god mode wins
 +     * (HP is refilled every step anyway).
 +     * Mana regen (PORT PATCH, QoL): DES_MANA_REGEN=1 gives the player MP back over time, DES_MANA_REGEN_RATE MP a
-+     * minute of game time (1..600, default 60), counted with the game's step (0x018C8DB4) so it is the same at any
++     * minute of game time (1..600, default 180 = 3 a second), counted with the game's step (0x018C8DB4) so it is the same at any
 +     * frame rate. Only while alive and below max MP; god mode (MP always full) wins. */
 +    { static int god = -1, clear_flag = 0, dump = -1, easy = 0, easy_pct = 50; static unsigned long long dump_t;
-+      static int mana = 0, mana_rate = 60; static float mana_acc = 0.0f;
++      static int mana = 0, mana_rate = 180; static float mana_acc = 0.0f;
 +      if (god < 0) { const char* e = getenv("DES_GOD"); god = (e && *e == '1') ? 1 : 0;
 +                     const char* d = getenv("DES_GOD_DUMP"); dump = d ? 1 : 0;
 +                     if (god) { fprintf(stderr, "[des] god mode ON (DES_GOD)\n"); g_des_title_god = 1; des_title(); }

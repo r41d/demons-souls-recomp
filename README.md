@@ -200,7 +200,7 @@ straight away, for a shortcut. Without the launcher, set the switches before run
 | *Dump textures* | `LD_TEX_DUMP=1` | saves every texture drawn, for texture packs |
 | *Skip the intro* | `DES_SKIP_INTRO=1` | starts at PRESS START; story movies still play |
 | *QoL Fixes: Easy mode at start* | `DES_EASY=1` | attacks that hit you take half as much HP (F7 toggles it in the game on Windows). `DES_EASY_DAMAGE=1-99` sets the percent (default 50). Falls, lava and poison may still do full damage. With god mode also on, god mode wins |
-| *QoL Fixes: Mana regen* | `DES_MANA_REGEN=1` | MP comes back over time: 60 a minute of game time, the same at any frame rate (`DES_MANA_REGEN_RATE=1-600` for another rate). Only while alive; god mode keeps MP full anyway |
+| *QoL Fixes: Mana regen* | `DES_MANA_REGEN=1` | MP comes back over time: 3 a second of game time, the same at any frame rate (`DES_MANA_REGEN_RATE=1-600` MP a minute for another rate; default 180). Only while alive; god mode keeps MP full anyway |
 | *QoL Fixes: Locked-on rolls follow the stick* | `DES_OMNIROLL=1` | locked on, you roll where the stick points instead of in 4 directions: the OmniRoll mod, built in (see [Mods](#mods-optional)) |
 | *Keep my build after updates* | `DES_NO_REBUILD=1` | plays your current build instead of rebuilding |
 | *Smooth GPU power* | `LD_GPU_WARM=2` (1-4) | only if your PC switches itself off or restarts while the port runs (but not in other games): keeps the GPU's power draw steady between frames so a power supply does not trip. No change to the picture or frame rate; the card draws more power. If it still happens, `LD_GPU_WARM=3` in Extra settings |

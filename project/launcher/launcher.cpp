@@ -461,7 +461,7 @@ static const UINT WM_LANG_LIST = WM_APP + 3, WM_LANG_LINE = WM_APP + 4, WM_LANG_
 static HWND g_wnd, g_tip;
 static HFONT g_font, g_font_big, g_font_title;
 // The Nexus look: near-black, parchment text, gold rules. Checkboxes and buttons are owner-drawn (draw_button); a
-// checkbox's state is its GWLP_USERDATA. Section titles, the header and the "Rings of the port" panel are painted in
+// checkbox's state is its GWLP_USERDATA. Section titles, the header and the QoL Fixes panel are painted in
 // WM_PAINT from what create_controls() records.
 namespace nx {
 const COLORREF BG = RGB(13, 11, 9), PANEL = RGB(20, 16, 10), FIELD = RGB(23, 18, 12), GOLD = RGB(201, 165, 90),
@@ -472,10 +472,10 @@ const COLORREF BG = RGB(13, 11, 9), PANEL = RGB(20, 16, 10), FIELD = RGB(23, 18,
 static HBRUSH g_br_bg, g_br_panel, g_br_field;
 static HFONT g_font_serif, g_font_play;
 static std::set<int> g_checkboxes;     // owner-drawn checkboxes
-static std::set<int> g_ring_ids;       // the ones inside the Rings panel (drawn on its colour)
+static std::set<int> g_ring_ids;       // the ones inside the QoL Fixes panel (drawn on its colour)
 struct Section { const wchar_t* text; int x, y, w; };
 static std::vector<Section> g_sections;   // gold-ruled section titles (logical px)
-static RECT g_rings;                      // the Rings of the port panel (logical px)
+static RECT g_rings;                      // the QoL Fixes panel (logical px)
 static int g_layout_h = 560;              // the client height create_controls() needs (logical px)
 static int g_game_last;                   // the Game choice before the current one
 static Gdiplus::Bitmap* g_banner;
@@ -1763,7 +1763,7 @@ static void draw_button(const DRAWITEMSTRUCT* d) {
     SelectObject(dc, old);
 }
 
-// The header (title, banner) and the gold rule under it, the section titles and the Rings panel; controls draw the rest.
+// The header (title, banner) and the gold rule under it, the section titles and the QoL Fixes panel; controls draw the rest.
 static const int HEADER_H = 100;
 static void paint_window(HDC dc, const RECT& rc) {
     using namespace nx;
@@ -1804,11 +1804,11 @@ static void paint_window(HDC dc, const RECT& rc) {
         SelectObject(dc, g_font_serif);
         SetTextColor(dc, GOLD);
         RECT tr = rect_px(g_rings.left + 12, g_rings.top + 7, 300, 22);
-        DrawTextW(dc, L"Rings of the port", -1, &tr, DT_LEFT | DT_TOP | DT_SINGLELINE | DT_NOPREFIX);
+        DrawTextW(dc, L"QoL Fixes", -1, &tr, DT_LEFT | DT_TOP | DT_SINGLELINE | DT_NOPREFIX);
         SelectObject(dc, g_font);
         SetTextColor(dc, MUTED);
         tr = rect_px(g_rings.left + 12, g_rings.top + 30, 380, 18);
-        DrawTextW(dc, L"QoL fixes: these change the original game", -1, &tr, DT_LEFT | DT_TOP | DT_SINGLELINE | DT_NOPREFIX);
+        DrawTextW(dc, L"These change the original game", -1, &tr, DT_LEFT | DT_TOP | DT_SINGLELINE | DT_NOPREFIX);
     }
     SelectObject(dc, old);
 }
@@ -1820,7 +1820,7 @@ static void create_controls() {
     SendMessageW(g_tip, TTM_SETMAXTIPWIDTH, 0, S(360));
     SendMessageW(g_tip, TTM_SETDELAYTIME, TTDT_AUTOPOP, 30000);
 
-    // Header (painted), then two columns: Picture and World left, Options and the Rings panel right; PLAY, the
+    // Header (painted), then two columns: Picture and World left, Options and the QoL Fixes panel right; PLAY, the
     // buttons and the status line span both. Logical px.
     const int L = 22, W = 424, GAP = 22, X = L + 118;   // left edge, column width, gap, the left column's controls
     const int CL = L + W + GAP, FW = 2 * W + GAP;     // the right column's left edge, the full width
@@ -1931,7 +1931,7 @@ static void create_controls() {
         L"happens, put LD_GPU_WARM=3 in Extra settings.");
     y += 32;
 
-    // The Rings of the port panel: the QoL fixes, options that change how the original game plays (off by default).
+    // The QoL Fixes panel: options that change how the original game plays (off by default).
     g_rings = RECT{CL, y, CL + W, y + 106};
     add(WC_BUTTONW, L"Easy mode at start (F7)", BS_AUTOCHECKBOX | WS_TABSTOP | WS_GROUP, ID_EASY, CL + 12, y + 52, 190, 22,
         L"Attacks that hit you take half as much HP. Falls, lava and poison may still do full damage. "
@@ -1941,7 +1941,7 @@ static void create_controls() {
         L"rolls no longer go the mirrored way. Stamina, i-frames and roll speed stay the game's own. "
         L"\"Omnidirectional Roll\" by hamzafallahi (Nexus Mods, Demon's Souls mod 192), built into the port.");
     add(WC_BUTTONW, L"Mana regen (MP comes back over time)", BS_AUTOCHECKBOX | WS_TABSTOP, ID_MANA, CL + 12, y + 78, 380, 22,
-        L"You slowly get MP back over time (60 MP a minute of game time), like a mana-regenerating ring that is always on. DES_MANA_REGEN_RATE in Extra settings changes the rate (1-600 MP a minute).");
+        L"You slowly get MP back over time (3 MP a second of game time), like a mana-regenerating ring that is always on. DES_MANA_REGEN_RATE in Extra settings changes the rate (1-600 MP a minute).");
     y += 106;
     const int yr = y;
 

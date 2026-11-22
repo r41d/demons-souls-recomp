@@ -509,7 +509,7 @@ def main_window(steam=False):
     qol.pack(fill='x', pady=(10, 0))
     for key, txt in (('easy', 'Easy mode at start: attacks that hit you take half as much HP'),
                      ('omniroll', 'Locked-on rolls follow the stick (the OmniRoll mod by hamzafallahi)'),
-                     ('mana', 'Mana regen: MP comes back over time (60 a minute)')):
+                     ('mana', 'Mana regen: MP comes back over time (3 a second)')):
         ttk.Checkbutton(qol, text=txt, variable=v[key]).pack(anchor='w')
 
     def current():
