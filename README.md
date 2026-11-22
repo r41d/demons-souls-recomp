@@ -169,7 +169,8 @@ macOS), with the game closed:
 - Run it again after an update.
 
 It covers the menus, item text, dialogue and subtitles (right to left, Arabic digits), the title logo and the title
-movie (the movie needs [ffmpeg](https://ffmpeg.org) on PATH; Windows: `winget install Gyan.FFmpeg`). Still English:
+movie (the movie needs [ffmpeg](https://ffmpeg.org): one on PATH, or else the installer fetches the `imageio-ffmpeg`
+package into the port's own Python, like numpy). Still English:
 pictures with text (NOW LOADING, YOU DIED, area titles) and the button help line's alignment. The HUD's L / R hand
 labels read يس / يم.
 Tested on Linux through Proton, except the title movie, which Proton does not play; not tested on Windows yet.

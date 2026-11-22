@@ -8,7 +8,8 @@
 What it does: reads the game's own English font, text, menu layout, menu textures and title movie, and writes
 Arabic versions of them (apply_ar.py): menu and item text (ar_text.json, our own translation), the fonts with the
 Arabic letter forms added (Noto Sans Arabic, SIL OFL), right-to-left menu layout, the title logo and the title movie
-(the movie needs ffmpeg on PATH; without it the movie keeps the English logo). The originals are copied to
+(the movie needs ffmpeg: one on PATH, or else the imageio-ffmpeg package, which this fetches into this Python
+like numpy; without either the movie keeps the English logo). The originals are copied to
 game/arabic_backup first, so --uninstall can put them back. Nothing from the game is in this folder. Don't run it
 while the game is running. Run it again after an update to rebuild.
 """
@@ -68,15 +69,49 @@ def need_numpy():
                        check=True)
 
 
+def need_ffmpeg():
+    """An ffmpeg for the title movie: the one on PATH, or else the imageio-ffmpeg package's (a pip wheel that carries
+    an ffmpeg build), fetched into this Python like numpy and linked as <venv>/ffmpeg/ffmpeg[.exe], whose folder is
+    put first on PATH for apply_ar.py. False when there is neither (the movie then keeps the English logo)."""
+    if shutil.which('ffmpeg'):
+        return True
+    try:
+        import imageio_ffmpeg  # noqa: F401
+    except ImportError:
+        print('Fetching ffmpeg into this Python (imageio-ffmpeg, for the title movie)...', flush=True)
+        r = subprocess.run([sys.executable, '-m', 'pip', 'install', '--disable-pip-version-check', '-q',
+                            'imageio-ffmpeg>=0.5'])
+        if r.returncode:
+            return False
+    try:
+        import imageio_ffmpeg
+        exe = imageio_ffmpeg.get_ffmpeg_exe()
+    except Exception as e:   # no build for this system
+        print('imageio-ffmpeg has no ffmpeg here:', e)
+        return False
+    d = os.path.join(sys.prefix, 'ffmpeg')
+    os.makedirs(d, exist_ok=True)
+    dst = os.path.join(d, 'ffmpeg.exe' if os.name == 'nt' else 'ffmpeg')
+    if not (os.path.exists(dst) and os.path.getsize(dst) == os.path.getsize(exe)):
+        if os.path.exists(dst):
+            os.remove(dst)
+        try:
+            os.link(exe, dst)
+        except OSError:
+            shutil.copy2(exe, dst)
+    os.environ['PATH'] = d + os.pathsep + os.environ.get('PATH', '')
+    return shutil.which('ffmpeg') is not None
+
+
 def install(usrdir):
     if not (os.path.exists(os.path.join(usrdir, 'MSG', 'NA_ENGLISH', 'menu.msgbnd')) or
             os.path.exists(os.path.join(usrdir, 'MSG', 'NA_ENGLISH', 'menu.msgbnd.dcx'))):
         sys.exit('This is not the USA disc (no MSG/NA_ENGLISH). The Arabic translation is made for BLUS-30443.')
     uninstall(usrdir, quiet=True)         # always build from the original English files
     need_numpy()
-    if not shutil.which('ffmpeg'):
-        print('Note: ffmpeg is not on PATH, so the title movie keeps the English logo '
-              '(Windows: winget install Gyan.FFmpeg, then run this again).')
+    if not need_ffmpeg():
+        print('Note: no ffmpeg (none on PATH and imageio-ffmpeg could not be fetched), so the title movie keeps the '
+              'English logo. Install ffmpeg (Windows: winget install Gyan.FFmpeg) and run this again.')
     out = tempfile.mkdtemp(prefix='des_arabic_')
     try:
         subprocess.run([sys.executable, os.path.join(HERE, 'apply_ar.py'), usrdir, out], check=True)

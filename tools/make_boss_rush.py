@@ -182,7 +182,9 @@ def translation():
 def stamp_text():
     h = hashlib.sha256(rd(MODULE) + rd(os.path.abspath(__file__))).hexdigest()
     return ('built by tools/make_boss_rush.py from game/\n' + h + '\nsouls x%d\n' % soul_mult() +
-            ('translation %s\n' % translation() if translation() else ''))
+            ('translation %s %d\n' % (translation(), os.stat(os.path.join(GAME, translation() + '_backup',
+                                                                       'INSTALLED.txt')).st_mtime_ns)
+             if translation() else ''))   # installed again (an update) -> built again
 
 
 def is_current(dst):
