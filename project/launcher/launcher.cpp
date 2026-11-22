@@ -452,7 +452,7 @@ static HANDLE start_game(const Settings& s, const LangEnv* lang) {
 enum {
     ID_PLAY = IDOK, ID_FPS = 100, ID_CUSTOM, ID_FPS_HINT, ID_RES, ID_SHADOW, ID_GAME0, ID_GAME1, ID_GAME2, ID_GAME3,
     ID_FULLSCREEN, ID_MOVIES, ID_GOD, ID_RECORD, ID_DUMP, ID_LETTER, ID_PIN, ID_NOREBUILD, ID_SKIPINTRO, ID_VRR, ID_EXTRA,
-    ID_UPDATE, ID_REPORT, ID_CONTROLS, ID_FOLDERS, ID_STATUS, ID_BRSOULS, ID_GPUWARM, ID_LANG, ID_EASY, ID_OMNIROLL, ID_QOL, ID_MANA,
+    ID_UPDATE, ID_REPORT, ID_CONTROLS, ID_FOLDERS, ID_STATUS, ID_BRSOULS, ID_GPUWARM, ID_LANG, ID_EASY, ID_OMNIROLL, ID_QOL, ID_MANA, ID_ADV, ID_WMIN, ID_WCLOSE, ID_BRSOULS_LBL,
     ID_F_SAVES = 200, ID_F_LOGS, ID_F_PERF, ID_F_REPLACE, ID_F_DUMP, ID_F_CAPTURES, ID_F_MODELS, ID_F_ROOT,
 };
 static const UINT WM_GAME_DONE = WM_APP + 1, WM_UPDATE_CHECKED = WM_APP + 2;
@@ -467,17 +467,20 @@ namespace nx {
 const COLORREF BG = RGB(13, 11, 9), PANEL = RGB(20, 16, 10), FIELD = RGB(23, 18, 12), GOLD = RGB(201, 165, 90),
                RULE = RGB(74, 60, 35), PANEL_EDGE = RGB(107, 85, 48), BOX = RGB(156, 127, 69),
                TEXT = RGB(214, 199, 163), BRIGHT = RGB(236, 224, 191), MUTED = RGB(133, 116, 84),
-               PLATE_TEXT = RGB(187, 168, 120), PRESSED = RGB(32, 25, 15);
+               PLATE_TEXT = RGB(187, 168, 120), PRESSED = RGB(32, 25, 15), HEADER = RGB(18, 14, 10);
 }
 static HBRUSH g_br_bg, g_br_panel, g_br_field;
 static HFONT g_font_serif, g_font_play;
 static std::set<int> g_checkboxes;     // owner-drawn checkboxes
 static std::set<int> g_ring_ids;       // the ones inside the QoL Fixes panel (drawn on its colour)
-struct Section { const wchar_t* text; int x, y, w; };
+struct Section { const wchar_t* text; int x, y, w; bool adv; };
 static std::vector<Section> g_sections;   // gold-ruled section titles (logical px)
 static RECT g_rings;                      // the QoL Fixes panel (logical px)
 static int g_layout_h = 560;              // the client height create_controls() needs (logical px)
 static int g_game_last;                   // the Game choice before the current one
+static bool g_adv;                        // the Advanced page is showing (instead of the main one)
+static std::set<int> g_links;             // footer links: owner-drawn text buttons
+static std::vector<int> g_page_main, g_page_adv;   // the controls of each page (shown / hidden by show_page)
 static Gdiplus::Bitmap* g_banner;
 static int g_dpi = 96, g_hz = 60;
 static HANDLE g_game;
@@ -545,6 +548,18 @@ static RECT rect_px(int x, int y, int w, int h) { return RECT{S(x), S(y), S(x + 
 
 // Game: a dropdown (Normal, PC Remaster, My models, Boss rush); a copy that is not there says so in its entry.
 static const wchar_t* const GAME_LABELS[] = {L"Normal (your disc)", L"PC Remaster", L"My models", L"Boss rush"};
+// What to do when a copy of the game is not there (the Game dropdown's status line; can_play says the same).
+static const wchar_t* const GAME_MISSING[] = {
+    L"The game files are not in the game folder. Run SETUP.bat.",
+    L"The PC Remaster mod is not installed (game_remaster). See \"Optional: PC Remaster mod\" in README.md.",
+    L"No models imported yet (game_mod). See models\\README.txt.",
+    L"The game files are not in the game folder. Run SETUP.bat."};
+static void sync_brsouls(int game) {   // Boss rush souls only shows with Boss rush, on the main page
+    const int show = game == GAME_BOSS_RUSH && !g_adv ? SW_SHOW : SW_HIDE;
+    ShowWindow(item(ID_BRSOULS), show);
+    ShowWindow(item(ID_BRSOULS_LBL), show);
+    EnableWindow(item(ID_BRSOULS), TRUE);
+}
 static int game_sel() {
     const int g = (int)SendMessageW(item(ID_GAME0), CB_GETCURSEL, 0, 0);
     return g >= 0 && g < GAME_COUNT ? g : 0;
@@ -621,6 +636,23 @@ static void update_fps_hint() {
     }
     }
     SetWindowTextW(item(ID_FPS_HINT), t);
+    // the hint lives in the Frame rate tooltip (the window has no room for a line of its own)
+    static wstring tip;
+    tip = wstring(L"How many frames a second the game runs at. The game runs at real speed at every choice.\n\n") + t;
+    TOOLINFOW ti{};
+    ti.cbSize = sizeof ti;
+    ti.uFlags = TTF_IDISHWND;
+    ti.hwnd = g_wnd;
+    ti.uId = (UINT_PTR)item(ID_FPS);
+    ti.lpszText = (LPWSTR)tip.c_str();
+    SendMessageW(g_tip, TTM_UPDATETIPTEXTW, 0, (LPARAM)&ti);
+    // Custom: a box for the number beside a narrower dropdown (main page only)
+    const bool custom = sel == FPS_CUSTOM;
+    RECT r;
+    GetWindowRect(item(ID_FPS), &r);
+    MapWindowPoints(nullptr, g_wnd, (POINT*)&r, 2);
+    SetWindowPos(item(ID_FPS), nullptr, 0, 0, S(custom ? 126 : 180), r.bottom - r.top, SWP_NOMOVE | SWP_NOZORDER);
+    ShowWindow(item(ID_CUSTOM), custom && !g_adv ? SW_SHOW : SW_HIDE);
 }
 
 static void update_status() {
@@ -715,7 +747,7 @@ static void write_controls() {
         int sel = 0;
         for (int i = 0; i < BR_SOULS_N; ++i) if (BR_SOULS_CHOICES[i] <= s.br_souls) sel = i;
         SendMessageW(item(ID_BRSOULS), CB_SETCURSEL, sel, 0);
-        EnableWindow(item(ID_BRSOULS), game == GAME_BOSS_RUSH);
+        sync_brsouls(game);
     }
     check(ID_GPUWARM, s.gpu_warm);
     SetWindowTextW(item(ID_EXTRA), s.extra.c_str());
@@ -1706,7 +1738,8 @@ static void on_folders() {
     }
 }
 
-// A checkbox: a gold-edged square (filled when on) and its label; a button: an outlined plate; PLAY: a double frame.
+// A checkbox: a gold-edged square (filled when on) and its label; a footer link: gold text; the window's own minimise /
+// close: a glyph; a button: an outlined plate; PLAY: a double frame.
 static void draw_button(const DRAWITEMSTRUCT* d) {
     using namespace nx;
     HDC dc = d->hDC;
@@ -1717,6 +1750,38 @@ static void draw_button(const DRAWITEMSTRUCT* d) {
     wchar_t t[256];
     GetWindowTextW(d->hwndItem, t, 256);
     SetBkMode(dc, TRANSPARENT);
+    if (id == ID_WMIN || id == ID_WCLOSE) {
+        fill(dc, r, down ? PRESSED : HEADER);
+        HPEN pen = CreatePen(PS_SOLID, std::max(1, S(1)), focus ? BRIGHT : GOLD);
+        HGDIOBJ op = SelectObject(dc, pen);
+        const int cx = (r.left + r.right) / 2, cy = (r.top + r.bottom) / 2, k = S(5);
+        if (id == ID_WMIN) {
+            MoveToEx(dc, cx - k, cy + S(3), nullptr);
+            LineTo(dc, cx + k + 1, cy + S(3));
+        } else {
+            MoveToEx(dc, cx - k, cy - k, nullptr);
+            LineTo(dc, cx + k + 1, cy + k + 1);
+            MoveToEx(dc, cx + k, cy - k, nullptr);
+            LineTo(dc, cx - k - 1, cy + k + 1);
+        }
+        SelectObject(dc, op);
+        DeleteObject(pen);
+        return;
+    }
+    if (g_links.count(id)) {
+        fill(dc, r, BG);
+        HGDIOBJ old = SelectObject(dc, g_font);
+        SetTextColor(dc, off ? MUTED : down ? BRIGHT : PLATE_TEXT);
+        DrawTextW(dc, t, -1, &r, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+        if (focus) {
+            RECT m = r;
+            DrawTextW(dc, t, -1, &m, DT_CALCRECT | DT_SINGLELINE | DT_NOPREFIX);
+            const int w = m.right - m.left, x = (r.left + r.right - w) / 2, y = (r.top + r.bottom + (m.bottom - m.top)) / 2;
+            fill(dc, RECT{x, y, x + w, y + S(1)}, GOLD);
+        }
+        SelectObject(dc, old);
+        return;
+    }
     if (g_checkboxes.count(id)) {
         FillRect(dc, &r, g_ring_ids.count(id) ? g_br_panel : g_br_bg);
         const int b = S(12), top = (r.top + r.bottom - b) / 2;
@@ -1725,7 +1790,7 @@ static void draw_button(const DRAWITEMSTRUCT* d) {
         if (GetWindowLongPtrW(d->hwndItem, GWLP_USERDATA)) {
             RECT in = box;
             InflateRect(&in, -S(3), -S(3));
-            fill(dc, in, off ? RULE : GOLD);
+            fill(dc, in, off ? MUTED : GOLD);
         }
         RECT tr = r;
         tr.left = box.right + S(8);
@@ -1750,7 +1815,7 @@ static void draw_button(const DRAWITEMSTRUCT* d) {
         frame(dc, in, off ? RULE : GOLD);
         if (focus) {
             InflateRect(&in, -S(2), -S(2));
-            frame(dc, in, RULE);
+            frame(dc, in, BOX);
         }
     } else {
         frame(dc, r, focus ? GOLD : RULE);
@@ -1763,31 +1828,35 @@ static void draw_button(const DRAWITEMSTRUCT* d) {
     SelectObject(dc, old);
 }
 
-// The header (title, banner) and the gold rule under it, the section titles and the QoL Fixes panel; controls draw the rest.
-static const int HEADER_H = 100;
+// The window has no Windows frame (WM_NCCALCSIZE): the header is its title bar (drag it; minimise / close are buttons).
+// Painted here: the header (the game's ICON0.PNG faded into the dark, the title), the section titles of the page that
+// shows, the QoL Fixes panel, and a thin gold edge round the window. The controls draw the rest.
+static const int HEADER_H = 84, WIN_W = 620;
 static void paint_window(HDC dc, const RECT& rc) {
     using namespace nx;
     SetBkMode(dc, TRANSPARENT);
+    fill(dc, RECT{0, 0, rc.right, S(HEADER_H)}, HEADER);
+    if (g_banner) {   // 320 x 176, at the header's right, fading into the header colour towards the title
+        Gdiplus::Graphics gfx(dc);
+        gfx.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+        const int bh = S(HEADER_H), bw = bh * 320 / 176, bx = rc.right - bw - S(70);
+        gfx.DrawImage(g_banner, bx, 0, bw, bh);
+        const Gdiplus::Color h(255, GetRValue(HEADER), GetGValue(HEADER), GetBValue(HEADER)),
+            clear(0, GetRValue(HEADER), GetGValue(HEADER), GetBValue(HEADER));
+        Gdiplus::LinearGradientBrush left(Gdiplus::Point(bx - 1, 0), Gdiplus::Point(bx + bw * 2 / 3, 0), h, clear);
+        gfx.FillRectangle(&left, bx - 1, 0, bw * 2 / 3 + 1, bh);
+        Gdiplus::LinearGradientBrush right(Gdiplus::Point(bx + bw + 1, 0), Gdiplus::Point(bx + bw * 2 / 3, 0), h, clear);
+        gfx.FillRectangle(&right, bx + bw * 2 / 3, 0, bw - bw * 2 / 3 + 1, bh);
+    }
     HGDIOBJ old = SelectObject(dc, g_font_title);
     SetTextColor(dc, BRIGHT);
     SetTextCharacterExtra(dc, S(3));
-    RECT t = rect_px(22, 14, 600, 48);
+    RECT t = rect_px(20, 22, 400, 50);
     DrawTextW(dc, L"Demon's Souls", -1, &t, DT_LEFT | DT_TOP | DT_SINGLELINE | DT_NOPREFIX);
     SetTextCharacterExtra(dc, 0);
-    SelectObject(dc, g_font);
-    SetTextColor(dc, MUTED);
-    t = rect_px(24, 66, 600, 20);
-    DrawTextW(dc, L"PC port launcher", -1, &t, DT_LEFT | DT_TOP | DT_SINGLELINE | DT_NOPREFIX);
-    if (g_banner) {   // the game's own ICON0.PNG (320 x 176), right of the title
-        Gdiplus::Graphics gfx(dc);
-        gfx.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
-        const int bw = S(154), bh = S(85);
-        gfx.DrawImage(g_banner, rc.right - S(22) - bw, S(8), bw, bh);
-        RECT f{rc.right - S(22) - bw - 1, S(8) - 1, rc.right - S(22) + 1, S(8) + bh + 1};
-        frame(dc, f, RULE);
-    }
-    fill(dc, RECT{S(22), S(HEADER_H), rc.right - S(22), S(HEADER_H) + 1}, RGB(140, 115, 64));
+    fill(dc, RECT{0, S(HEADER_H), rc.right, S(HEADER_H) + 1}, RULE);
     for (const Section& sec : g_sections) {
+        if (sec.adv != g_adv) continue;
         SelectObject(dc, g_font_serif);
         SetTextColor(dc, GOLD);
         RECT m{0, 0, 0, 0};
@@ -1797,20 +1866,31 @@ static void paint_window(HDC dc, const RECT& rc) {
         const int ly = (tr.top + tr.bottom) / 2 + 1;
         if (tr.right + S(10) < S(sec.x + sec.w)) fill(dc, RECT{tr.right + S(10), ly, S(sec.x + sec.w), ly + 1}, RULE);
     }
-    if (g_rings.right > g_rings.left) {
+    if (!g_adv && g_rings.right > g_rings.left) {
         RECT p = rect_px(g_rings.left, g_rings.top, g_rings.right - g_rings.left, g_rings.bottom - g_rings.top);
         fill(dc, p, PANEL);
         frame(dc, p, PANEL_EDGE);
         SelectObject(dc, g_font_serif);
         SetTextColor(dc, GOLD);
-        RECT tr = rect_px(g_rings.left + 12, g_rings.top + 7, 300, 22);
+        RECT tr = rect_px(g_rings.left + 10, g_rings.top + 6, 120, 20);
         DrawTextW(dc, L"QoL Fixes", -1, &tr, DT_LEFT | DT_TOP | DT_SINGLELINE | DT_NOPREFIX);
         SelectObject(dc, g_font);
         SetTextColor(dc, MUTED);
-        tr = rect_px(g_rings.left + 12, g_rings.top + 30, 380, 18);
-        DrawTextW(dc, L"These change the original game", -1, &tr, DT_LEFT | DT_TOP | DT_SINGLELINE | DT_NOPREFIX);
+        tr = rect_px(g_rings.left + 10, g_rings.top + 8, g_rings.right - g_rings.left - 20, 18);
+        DrawTextW(dc, L"These change the original game", -1, &tr, DT_RIGHT | DT_TOP | DT_SINGLELINE | DT_NOPREFIX);
     }
+    frame(dc, rc, PANEL_EDGE);   // the window's edge
     SelectObject(dc, old);
+}
+
+static void show_page(bool adv) {
+    g_adv = adv;
+    for (int id : g_page_main) ShowWindow(item(id), adv ? SW_HIDE : SW_SHOW);
+    for (int id : g_page_adv) ShowWindow(item(id), adv ? SW_SHOW : SW_HIDE);
+    sync_brsouls(game_sel());
+    update_fps_hint();   // the Custom box (main page)
+    SetWindowTextW(item(ID_ADV), adv ? L"Back" : L"Advanced");
+    InvalidateRect(g_wnd, nullptr, TRUE);
 }
 
 static void create_controls() {
@@ -1820,163 +1900,184 @@ static void create_controls() {
     SendMessageW(g_tip, TTM_SETMAXTIPWIDTH, 0, S(360));
     SendMessageW(g_tip, TTM_SETDELAYTIME, TTDT_AUTOPOP, 30000);
 
-    // Header (painted), then two columns: Picture and World left, Options and the QoL Fixes panel right; PLAY, the
-    // buttons and the status line span both. Logical px.
-    const int L = 22, W = 424, GAP = 22, X = L + 118;   // left edge, column width, gap, the left column's controls
-    const int CL = L + W + GAP, FW = 2 * W + GAP;     // the right column's left edge, the full width
-    const int y0 = HEADER_H + 14;
-    int y = y0;
+    // Logical px. Header; two columns (the main page: Picture + World | Options + QoL Fixes; the Advanced page in the
+    // same place); PLAY; a row of links; the status line.
+    const int L = 18, W = 280, GAP = 24, X = L + 96, CW = W - 96;   // left edge, column, gap, dropdowns, their width
+    const int CL = L + W + GAP, FW = 2 * W + GAP, C2 = CL + W / 2;
+    const int y0 = HEADER_H + 16;
     g_sections.clear();
+    g_page_main.clear();
+    g_page_adv.clear();
     g_ring_ids = {ID_EASY, ID_OMNIROLL, ID_MANA};
+    g_links = {ID_ADV, ID_CONTROLS, ID_FOLDERS, ID_UPDATE, ID_REPORT};
+    auto main_ = [](HWND h) { g_page_main.push_back(GetDlgCtrlID(h)); return h; };
+    auto adv_ = [](HWND h) { g_page_adv.push_back(GetDlgCtrlID(h)); return h; };
 
-    g_sections.push_back({L"Picture", L, y, W});
-    y += 30;
-    label(L"Frame rate", L, y + 3, 110);
-    HWND c = add(WC_COMBOBOXW, nullptr, CBS_DROPDOWNLIST | WS_TABSTOP | WS_VSCROLL, ID_FPS, X, y, 214, 200,
-                 L"How many frames a second the game runs at. The game runs at real speed at every choice.");
-    for (const wchar_t* t : {L"Auto (an even rate for your screen)", L"30 fps (the original game)", L"50 fps (100 Hz screens)",
-                             L"60 fps", L"Unlimited (up to 240, no vsync)", L"Custom..."})
+    add(WC_BUTTONW, L"", BS_PUSHBUTTON, ID_WMIN, WIN_W - 70, 6, 30, 24, L"Minimise");
+    add(WC_BUTTONW, L"", BS_PUSHBUTTON, ID_WCLOSE, WIN_W - 38, 6, 30, 24, L"Close");
+
+    // --- main page: left ---
+    int y = y0;
+    g_sections.push_back({L"Picture", L, y, W, false});
+    y += 28;
+    main_(label(L"Frame rate", L, y + 3, 92, 20, 900));
+    HWND c = main_(add(WC_COMBOBOXW, nullptr, CBS_DROPDOWNLIST | WS_TABSTOP | WS_VSCROLL, ID_FPS, X, y, CW, 200,
+                       L"How many frames a second the game runs at. The game runs at real speed at every choice."));
+    for (const wchar_t* t : {L"Auto (even for your screen)", L"30 fps (the original)", L"50 fps (100 Hz screens)",
+                             L"60 fps", L"Unlimited (up to 240)", L"Custom..."})
         SendMessageW(c, CB_ADDSTRING, 0, (LPARAM)t);
-    add(WC_EDITW, nullptr, WS_BORDER | WS_TABSTOP | ES_NUMBER | ES_CENTER, ID_CUSTOM, X + 222, y + 1, 48, 22,
+    add(WC_EDITW, nullptr, WS_BORDER | WS_TABSTOP | ES_NUMBER | ES_CENTER, ID_CUSTOM, X + 132, y + 1, 52, 22,
         L"Any whole number from 31 to 240, e.g. 72 or 144 on a 144 Hz screen. Smoothest when your screen's "
         L"refresh rate is a multiple of it.");
-    label(L"fps", X + 276, y + 3, 30);
-    y += 28;
-    label(L"", X, y, W - (X - L), 32, ID_FPS_HINT);
-    y += 36;
-    label(L"Resolution", L, y + 3, 110);
-    c = add(WC_COMBOBOXW, nullptr, CBS_DROPDOWNLIST | WS_TABSTOP | WS_VSCROLL, ID_RES, X, y, 214, 200,
-            L"Renders the game at a multiple of its own 1280x720: much sharper, at no cost on the CPU side. "
-            L"1.5x matches a 1080p screen; a mid-range GPU handles 2x easily. The picture always fills the window at 16:9.");
-    for (const wchar_t* t : {L"1x  1280x720 (the original)", L"1.25x  1600x900", L"1.5x  1920x1080", L"2x  2560x1440",
-                             L"3x  3840x2160 (4K)", L"4x  5120x2880"})
+    ShowWindow(label(L"", 0, 0, 1, 1, ID_FPS_HINT), SW_HIDE);   // its text goes into the Frame rate tooltip
+    y += 30;
+    main_(label(L"Resolution", L, y + 3, 92, 20, 901));
+    c = main_(add(WC_COMBOBOXW, nullptr, CBS_DROPDOWNLIST | WS_TABSTOP | WS_VSCROLL, ID_RES, X, y, CW, 200,
+                  L"Renders the game at a multiple of its own 1280x720: much sharper, at no cost on the CPU side. "
+                  L"1.5x matches a 1080p screen; a mid-range GPU handles 2x easily. The picture always fills the window "
+                  L"at 16:9."));
+    for (const wchar_t* t : {L"1x  1280x720", L"1.25x  1600x900", L"1.5x  1920x1080", L"2x  2560x1440", L"3x  3840x2160",
+                             L"4x  5120x2880"})
         SendMessageW(c, CB_ADDSTRING, 0, (LPARAM)t);
+    y += 38;
+    g_sections.push_back({L"World", L, y, W, false});
+    y += 28;
+    main_(label(L"Game", L, y + 3, 92, 20, 902));
+    main_(add(WC_COMBOBOXW, nullptr, CBS_DROPDOWNLIST | WS_TABSTOP | WS_VSCROLL, ID_GAME0, X, y, CW, 200,
+              L"Which copy of the game to play. Normal: your game as on the disc. PC Remaster: the \"Demon's Souls PC "
+              L"Remaster\" mod by fromsoftserve (game_remaster; install it with tools\\install_remaster.py, see README.md). "
+              L"My models: the copy with your imported models (game_mod, made by tools\\flver_tool.py import). Boss rush: a "
+              L"new character starts in the Nexus with 7,000 souls; each archstone takes you to its world's next boss, a "
+              L"timer runs from the first boss fog to King Allant. Its own saves (bossrush\\)."));
     y += 30;
-    add(WC_BUTTONW, L"Sharper shadows too", BS_AUTOCHECKBOX | WS_TABSTOP, ID_SHADOW, X, y, 240, 22,
-        L"Also renders the 2048x2048 shadow map at the higher resolution (more GPU work).");
-    y += 34;
-
-    g_sections.push_back({L"World", L, y, W});
+    main_(label(L"Language", L, y + 3, 92, 20, 903));
+    main_(add(WC_COMBOBOXW, nullptr, CBS_DROPDOWNLIST | WS_TABSTOP | WS_VSCROLL, ID_LANG, X, y, CW, 200,
+              L"The game's language. English; on the European disc also its French, German, Spanish and Italian; and "
+              L"translations made by players (translations folder), which PLAY puts into your game files the first time "
+              L"(the original files are kept and go back when you pick another language)."));
     y += 30;
-    label(L"Game", L, y + 3, 110);
-    add(WC_COMBOBOXW, nullptr, CBS_DROPDOWNLIST | WS_TABSTOP | WS_VSCROLL, ID_GAME0, X, y, 214, 200,
-        L"Which copy of the game to play. Normal: your game as on the disc. PC Remaster: the \"Demon's Souls PC "
-        L"Remaster\" mod by fromsoftserve (game_remaster; install it with tools\\install_remaster.py, see README.md). "
-        L"My models: the copy with your imported models (game_mod, made by tools\\flver_tool.py import). Boss rush: a "
-        L"new character starts in the Nexus with 7,000 souls; each archstone takes you to its world's next boss, a timer "
-        L"runs from the first boss fog to King Allant. Its own saves (bossrush\\).");
-    y += 30;
-    label(L"Boss rush souls", L, y + 3, 110);
-    c = add(WC_COMBOBOXW, nullptr, CBS_DROPDOWNLIST | WS_TABSTOP | WS_VSCROLL, ID_BRSOULS, X, y, 140, 200,
+    label(L"Boss rush souls", L, y + 3, 92, 20, ID_BRSOULS_LBL);   // shown with Boss rush only (sync_brsouls)
+    c = add(WC_COMBOBOXW, nullptr, CBS_DROPDOWNLIST | WS_TABSTOP | WS_VSCROLL, ID_BRSOULS, X, y, 120, 200,
             L"Boss rush only: every enemy and boss gives this many times its souls (picking up your bloodstain gives back "
             L"what you lost). The timer shows it when it is not 1x, for videos and runs.");
-    for (const wchar_t* t : {L"1x (the game's own)", L"2x", L"3x", L"5x", L"10x"})
+    for (const wchar_t* t : {L"1x souls", L"2x souls", L"3x souls", L"5x souls", L"10x souls"})
         SendMessageW(c, CB_ADDSTRING, 0, (LPARAM)t);
-    y += 30;
-    label(L"Language", L, y + 3, 110);
-    add(WC_COMBOBOXW, nullptr, CBS_DROPDOWNLIST | WS_TABSTOP | WS_VSCROLL, ID_LANG, X, y, 214, 200,
-        L"The game's language. English; on the European disc also its French, German, Spanish and Italian; and "
-        L"translations made by players (translations folder), which PLAY puts into your game files the first time "
-        L"(the original files are kept and go back when you pick another language).");
-    y += 30;
-    label(L"Extra settings", L, y + 3, 110);
-    add(WC_EDITW, nullptr, WS_BORDER | WS_TABSTOP | ES_AUTOHSCROLL, ID_EXTRA, X, y, W - (X - L), 22,
-        L"For testing, or when asked in an issue: NAME=value pairs separated by spaces, e.g. LD_PSO_ASYNC=0 "
-        L"LD_SWAP_RESIZE=0. They are set last, so they win over the choices above.");
     y += 30;
     const int yl = y;
 
+    // --- main page: right ---
     y = y0;
-    g_sections.push_back({L"Options", CL, y, W});
-    y += 30;
-    const int C2 = CL + W / 2;
-    add(WC_BUTTONW, L"Start in fullscreen", BS_AUTOCHECKBOX | WS_TABSTOP | WS_GROUP, ID_FULLSCREEN, CL, y, 200, 22,
-        L"Borderless fullscreen. Alt+Enter or F11 switches in the game.");
-    add(WC_BUTTONW, L"Play movies", BS_AUTOCHECKBOX | WS_TABSTOP, ID_MOVIES, C2, y, 200, 22,
-        L"The title logo, intro, story and ending movies. Untick to skip them.");
+    g_sections.push_back({L"Options", CL, y, W, false});
+    y += 28;
+    main_(add(WC_BUTTONW, L"Fullscreen", BS_AUTOCHECKBOX | WS_TABSTOP | WS_GROUP, ID_FULLSCREEN, CL, y, 130, 22,
+              L"Start in borderless fullscreen. Alt+Enter or F11 switches in the game."));
+    main_(add(WC_BUTTONW, L"God mode (F9)", BS_AUTOCHECKBOX | WS_TABSTOP, ID_GOD, C2, y, 140, 22,
+              L"You cannot die and HP, MP and stamina stay full. F9 turns it on and off in the game."));
     y += 26;
-    add(WC_BUTTONW, L"God mode at start (F9)", BS_AUTOCHECKBOX | WS_TABSTOP, ID_GOD, CL, y, 200, 22,
-        L"You cannot die and HP, MP and stamina stay full. F9 turns it on and off in the game.");
-    add(WC_BUTTONW, L"Record frame timing (F8)", BS_AUTOCHECKBOX | WS_TABSTOP, ID_RECORD, C2, y, 200, 22,
-        L"Records frame timing while you play (about 25 MB an hour, no visible cost). Press F8 right after a "
-        L"stutter; \"Report a problem\" packs it up for a GitHub issue.");
+    main_(add(WC_BUTTONW, L"Movies", BS_AUTOCHECKBOX | WS_TABSTOP, ID_MOVIES, CL, y, 130, 22,
+              L"The title logo, intro, story and ending movies. Untick to skip them."));
+    main_(add(WC_BUTTONW, L"G-Sync screen", BS_AUTOCHECKBOX | WS_TABSTOP, ID_VRR, C2, y, 140, 22,
+              L"Tick this if your monitor has G-Sync, FreeSync or another variable refresh rate (and it is on). The game "
+              L"then lets the monitor follow its frames: 60 fps is smooth at any refresh rate. Without such a monitor "
+              L"leave it off: the picture would tear."));
     y += 26;
-    add(WC_BUTTONW, L"Dump textures", BS_AUTOCHECKBOX | WS_TABSTOP, ID_DUMP, CL, y, 200, 22,
-        L"Saves every texture the game draws to textures\\dump, for texture packs. Replacements in "
-        L"textures\\replace always load. May stutter a little in new areas.");
-    add(WC_BUTTONW, L"Keys by letter", BS_AUTOCHECKBOX | WS_TABSTOP, ID_LETTER, C2, y, 200, 22,
-        L"Keys go by position (ZQSD on AZERTY moves like WASD). Tick this to go by the letter printed on the key.");
-    y += 26;
-    add(WC_BUTTONW, L"Pin to the fastest cores", BS_AUTOCHECKBOX | WS_TABSTOP, ID_PIN, CL, y, 200, 22,
-        L"On CPUs with two core groups (e.g. Ryzen X3D) the game runs on the group with the biggest cache. "
-        L"Untick if your system manages that itself.");
-    add(WC_BUTTONW, L"Keep my build after updates", BS_AUTOCHECKBOX | WS_TABSTOP, ID_NOREBUILD, C2, y, 212, 22,
-        L"After an update, Play normally rebuilds the game first (only what changed). Tick this to play the build "
-        L"you already have instead; the update's fixes then wait until you run BUILD.bat. An old build with new "
-        L"files can misbehave (e.g. a black screen with movies on).");
-    y += 26;
-    add(WC_BUTTONW, L"Skip the intro", BS_AUTOCHECKBOX | WS_TABSTOP, ID_SKIPINTRO, CL, y, 200, 22,
-        L"Straight to PRESS START: confirms the autosave notice, fast-forwards the logos and skips the opening "
-        L"movie, so the game starts at the title screen in a few seconds. The story movies later on still play.");
-    add(WC_BUTTONW, L"G-Sync / FreeSync screen", BS_AUTOCHECKBOX | WS_TABSTOP, ID_VRR, C2, y, 212, 22,
-        L"Tick this if your monitor has G-Sync, FreeSync or another variable refresh rate (and it is on). The game "
-        L"then lets the monitor follow its frames: 60 fps is smooth at any refresh rate. Without such a monitor "
-        L"leave it off: the picture would tear.");
-    y += 26;
-    add(WC_BUTTONW, L"Smooth GPU power (if your PC switches off)", BS_AUTOCHECKBOX | WS_TABSTOP, ID_GPUWARM, CL, y, 400, 22,
-        L"Only if your PC switches itself off (or restarts) while the port runs but not in other games. The port's "
-        L"GPU work comes in short bursts, and a big graphics card jumping between idle and full power many times a "
-        L"second can trip a power supply. This fills the gaps with light GPU work so the power draw stays steady. "
-        L"No change to the picture or the frame rate; the card draws more power and runs warmer. If it still "
-        L"happens, put LD_GPU_WARM=3 in Extra settings.");
+    main_(add(WC_BUTTONW, L"Skip the intro", BS_AUTOCHECKBOX | WS_TABSTOP, ID_SKIPINTRO, CL, y, 140, 22,
+              L"Straight to PRESS START: confirms the autosave notice, fast-forwards the logos and skips the opening "
+              L"movie, so the game starts at the title screen in a few seconds. The story movies later on still play."));
     y += 32;
-
-    // The QoL Fixes panel: options that change how the original game plays (off by default).
-    g_rings = RECT{CL, y, CL + W, y + 106};
-    add(WC_BUTTONW, L"Easy mode at start (F7)", BS_AUTOCHECKBOX | WS_TABSTOP | WS_GROUP, ID_EASY, CL + 12, y + 52, 190, 22,
-        L"Attacks that hit you take half as much HP. Falls, lava and poison may still do full damage. "
-        L"F7 turns it on and off in the game (Windows); with god mode also on, god mode wins.");
-    add(WC_BUTTONW, L"OmniRoll: rolls follow the stick", BS_AUTOCHECKBOX | WS_TABSTOP, ID_OMNIROLL, C2, y + 52, 204, 22,
-        L"Locked on, you roll exactly where the stick points instead of in one of 4 directions; unlocked diagonal "
-        L"rolls no longer go the mirrored way. Stamina, i-frames and roll speed stay the game's own. "
-        L"\"Omnidirectional Roll\" by hamzafallahi (Nexus Mods, Demon's Souls mod 192), built into the port.");
-    add(WC_BUTTONW, L"Mana regen (MP comes back over time)", BS_AUTOCHECKBOX | WS_TABSTOP, ID_MANA, CL + 12, y + 78, 380, 22,
-        L"You slowly get MP back over time (3 MP a second of game time), like a mana-regenerating ring that is always on. DES_MANA_REGEN_RATE in Extra settings changes the rate (1-600 MP a minute).");
-    y += 106;
+    g_rings = RECT{CL, y, CL + W, y + 84};
+    main_(add(WC_BUTTONW, L"Easy mode (F7)", BS_AUTOCHECKBOX | WS_TABSTOP | WS_GROUP, ID_EASY, CL + 10, y + 30, 126, 22,
+              L"Attacks that hit you take half as much HP. Falls, lava and poison may still do full damage. "
+              L"F7 turns it on and off in the game (Windows); with god mode also on, god mode wins."));
+    main_(add(WC_BUTTONW, L"OmniRoll", BS_AUTOCHECKBOX | WS_TABSTOP, ID_OMNIROLL, C2, y + 30, 124, 22,
+              L"Rolls follow the stick: locked on, you roll exactly where the stick points instead of in one of 4 "
+              L"directions; unlocked diagonal rolls no longer go the mirrored way. Stamina, i-frames and roll speed stay "
+              L"the game's own. \"Omnidirectional Roll\" by hamzafallahi (Nexus Mods, Demon's Souls mod 192), built into "
+              L"the port."));
+    main_(add(WC_BUTTONW, L"Mana regen", BS_AUTOCHECKBOX | WS_TABSTOP, ID_MANA, CL + 10, y + 56, 126, 22,
+              L"You slowly get MP back over time (3 MP a second of game time), like a mana-regenerating ring that is always on. DES_MANA_REGEN_RATE in Extra settings changes the rate (1-600 MP a minute)."));
+    y += 84;
     const int yr = y;
 
-    y = std::max(yl, yr) + 16;
-    c = add(WC_BUTTONW, L"PLAY", BS_DEFPUSHBUTTON | WS_TABSTOP | WS_GROUP, ID_PLAY, L, y, FW, 50);
+    // --- Advanced page (same place) ---
+    y = y0;
+    g_sections.push_back({L"Advanced", L, y, FW, true});
+    y += 28;
+    const int A2 = L + FW / 2;
+    adv_(add(WC_BUTTONW, L"Sharper shadows (with a higher resolution)", BS_AUTOCHECKBOX | WS_TABSTOP | WS_GROUP, ID_SHADOW,
+             L, y, 280, 22, L"Also renders the 2048x2048 shadow map at the higher resolution (more GPU work)."));
+    adv_(add(WC_BUTTONW, L"Keys by letter", BS_AUTOCHECKBOX | WS_TABSTOP, ID_LETTER, A2, y, 280, 22,
+             L"Keys go by position (ZQSD on AZERTY moves like WASD). Tick this to go by the letter printed on the key."));
+    y += 26;
+    adv_(add(WC_BUTTONW, L"Record frame timing (F8)", BS_AUTOCHECKBOX | WS_TABSTOP, ID_RECORD, L, y, 280, 22,
+             L"Records frame timing while you play (about 25 MB an hour, no visible cost). Press F8 right after a "
+             L"stutter; \"Report a problem\" packs it up for a GitHub issue."));
+    adv_(add(WC_BUTTONW, L"Keep my build after updates", BS_AUTOCHECKBOX | WS_TABSTOP, ID_NOREBUILD, A2, y, 280, 22,
+             L"After an update, Play normally rebuilds the game first (only what changed). Tick this to play the build "
+             L"you already have instead; the update's fixes then wait until you run BUILD.bat. An old build with new "
+             L"files can misbehave (e.g. a black screen with movies on)."));
+    y += 26;
+    adv_(add(WC_BUTTONW, L"Pin to the fastest CPU cores", BS_AUTOCHECKBOX | WS_TABSTOP, ID_PIN, L, y, 280, 22,
+             L"On CPUs with two core groups (e.g. Ryzen X3D) the game runs on the group with the biggest cache. "
+             L"Untick if your system manages that itself."));
+    adv_(add(WC_BUTTONW, L"Smooth GPU power (if your PC switches off)", BS_AUTOCHECKBOX | WS_TABSTOP, ID_GPUWARM, A2, y, 290,
+             22,
+             L"Only if your PC switches itself off (or restarts) while the port runs but not in other games. The port's "
+             L"GPU work comes in short bursts, and a big graphics card jumping between idle and full power many times a "
+             L"second can trip a power supply. This fills the gaps with light GPU work so the power draw stays steady. "
+             L"No change to the picture or the frame rate; the card draws more power and runs warmer. If it still "
+             L"happens, put LD_GPU_WARM=3 in Extra settings."));
+    y += 26;
+    adv_(add(WC_BUTTONW, L"Dump textures (for texture packs)", BS_AUTOCHECKBOX | WS_TABSTOP, ID_DUMP, L, y, 280, 22,
+             L"Saves every texture the game draws to textures\\dump, for texture packs. Replacements in "
+             L"textures\\replace always load. May stutter a little in new areas."));
+    y += 36;
+    adv_(label(L"Extra settings", L, y + 3, 92, 20, 904));
+    adv_(add(WC_EDITW, nullptr, WS_BORDER | WS_TABSTOP | ES_AUTOHSCROLL, ID_EXTRA, X, y, FW - (X - L), 22,
+             L"For testing, or when asked in an issue: NAME=value pairs separated by spaces, e.g. LD_PSO_ASYNC=0 "
+             L"LD_SWAP_RESIZE=0. They are set last, so they win over the choices above."));
+    y += 30;
+    const int ya = y;
+
+    // --- PLAY, links, status ---
+    y = std::max(std::max(yl, yr), ya) + 10;
+    c = add(WC_BUTTONW, L"PLAY", BS_DEFPUSHBUTTON | WS_TABSTOP | WS_GROUP, ID_PLAY, L, y, FW, 46);
     SendMessageW(c, WM_SETFONT, (WPARAM)g_font_play, FALSE);
-    y += 62;
-    const int bw = (FW - 3 * 10) / 4;
-    add(WC_BUTTONW, L"Check for updates", BS_PUSHBUTTON | WS_TABSTOP, ID_UPDATE, L, y, bw, 30,
-        L"Asks GitHub whether there is a newer version, shows what changed and installs it if you want, then rebuilds "
-        L"(BUILD.bat). No git needed: a copy from a release ZIP gets the newest release.");
-    add(WC_BUTTONW, L"Report a problem", BS_PUSHBUTTON | WS_TABSTOP, ID_REPORT, L + (bw + 10), y, bw, 30,
-        L"Packs your last session (recording, F8 marks, log, PC specs) into a zip and opens a GitHub issue (REPORT.bat).");
-    add(WC_BUTTONW, L"Controls", BS_PUSHBUTTON | WS_TABSTOP, ID_CONTROLS, L + 2 * (bw + 10), y, bw, 30,
-        L"Change the keyboard and mouse keys. The game's button prompts follow them.");
-    add(WC_BUTTONW, L"Folders \u25b4", BS_PUSHBUTTON | WS_TABSTOP, ID_FOLDERS, L + 3 * (bw + 10), y, bw, 30,
-        L"Saves, logs, recordings, texture and model folders.");
-    y += 40;
-    label(L"", L, y, FW, 20, ID_STATUS);
-    g_layout_h = y + 20 + 12;
+    y += 54;
+    struct Link { int id; const wchar_t* text; int w; const wchar_t* tip; };
+    const Link links[] = {
+        {ID_ADV, L"Advanced", 92, L"Shadows, recording, CPU pinning, texture dumps, keys and Extra settings."},
+        {ID_CONTROLS, L"Controls", 92, L"Change the keyboard and mouse keys. The game's button prompts follow them."},
+        {ID_FOLDERS, L"Folders \u25b4", 92, L"Saves, logs, recordings, texture and model folders."},
+        {ID_UPDATE, L"Check for Updates", 136,
+         L"Asks GitHub whether there is a newer version, shows what changed and installs it if you want, then rebuilds "
+         L"(BUILD.bat). No git needed: a copy from a release ZIP gets the newest release."},
+        {ID_REPORT, L"Report a problem", 128,
+         L"Packs your last session (recording, F8 marks, log, PC specs) into a zip and opens a GitHub issue (REPORT.bat)."},
+    };
+    int lw = 0;
+    for (const Link& k : links) lw += k.w;
+    int x = L + (FW - lw) / 2;
+    for (const Link& k : links) {
+        add(WC_BUTTONW, k.text, BS_PUSHBUTTON | WS_TABSTOP, k.id, x, y, k.w, 22, k.tip);
+        x += k.w;
+    }
+    y += 28;
+    add(L"STATIC", L"", SS_CENTER, ID_STATUS, L, y, FW, 18);
+    g_layout_h = y + 18 + 12;
+    show_page(false);
 }
 
 static int client_h() { return g_layout_h; }   // create_controls() sets it; the window is sized to it after
-static int client_w() { return 22 + 424 + 22 + 424 + 22; }
+static int client_w() { return WIN_W; }
 
 static LRESULT CALLBACK wndproc(HWND w, UINT m, WPARAM wp, LPARAM lp) {
     switch (m) {
     case WM_CREATE:
         g_wnd = w;
         create_controls();
-        {   // the window to the height the layout used
-            RECT r{0, 0, S(client_w()), S(g_layout_h)};
-            AdjustWindowRect(&r, (DWORD)GetWindowLongPtrW(w, GWL_STYLE), FALSE);
-            SetWindowPos(w, nullptr, 0, 0, r.right - r.left, r.bottom - r.top, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
-        }
+        // the window to the height the layout used (no Windows frame: the window is all client area)
+        SetWindowPos(w, nullptr, 0, 0, S(client_w()), S(g_layout_h), SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
         write_controls();
         update_status();
         lang_refresh();
@@ -1997,32 +2098,37 @@ static LRESULT CALLBACK wndproc(HWND w, UINT m, WPARAM wp, LPARAM lp) {
             check(id, !checked(id));
             code = BN_CLICKED;
         }
-        if (id == ID_PLAY) on_play();
+        if (id == ID_WCLOSE) PostMessageW(w, WM_CLOSE, 0, 0);
+        else if (id == ID_WMIN) ShowWindow(w, SW_MINIMIZE);
+        else if (id == ID_ADV) show_page(!g_adv);
+        else if (id == ID_PLAY) on_play();
         else if (id == ID_UPDATE) on_update();
         else if (id == ID_REPORT) run_report(w);
         else if (id == ID_CONTROLS) on_controls();
         else if (id == ID_FOLDERS) on_folders();
         else if (id == ID_FPS && code == CBN_SELCHANGE) {
             update_fps_hint();
-            if (SendMessageW(item(ID_FPS), CB_GETCURSEL, 0, 0) == FPS_CUSTOM) {
+            if (SendMessageW(item(ID_FPS), CB_GETCURSEL, 0, 0) == FPS_CUSTOM && !g_adv) {
                 SetFocus(item(ID_CUSTOM));
                 SendMessageW(item(ID_CUSTOM), EM_SETSEL, 0, -1);
             }
         } else if (id == ID_CUSTOM && code == EN_CHANGE && !g_loading) update_fps_hint();
         else if (id == ID_VRR && code == BN_CLICKED) update_fps_hint();
         else if (id == ID_GAME0 && code == CBN_SELCHANGE) {
+            // A copy that is not there is stepped over in the direction of travel (arrow keys, the wheel), so every
+            // copy that is there can be reached; the status line says how to get the missing one.
             int g = game_sel();
-            if (!game_present(g)) {   // a copy that is not there: say how to get it, keep the choice before
-                MessageBoxW(w, g == 1 ? L"The PC Remaster mod is not installed (game_remaster). See \"Optional: PC Remaster "
-                                        L"mod\" in README.md."
-                                      : L"No models imported yet (game_mod). See models\\README.txt.",
-                            L"Demon's Souls", MB_ICONINFORMATION);
-                g = g_game_last;
+            if (!game_present(g)) {
+                SetWindowTextW(item(ID_STATUS), GAME_MISSING[g]);
+                const int dir = g > g_game_last ? 1 : -1;
+                int k = g;
+                while (k >= 0 && k < GAME_COUNT && !game_present(k)) k += dir;
+                g = (k >= 0 && k < GAME_COUNT) ? k : g_game_last;
                 SendMessageW(item(ID_GAME0), CB_SETCURSEL, g, 0);
             }
-            {
+            if (g != g_game_last) {
                 g_game_last = g;
-                EnableWindow(item(ID_BRSOULS), g == GAME_BOSS_RUSH);
+                sync_brsouls(g);
                 lang_refresh();   // another folder can have other languages (fix 162)
             }
         } else if (id == ID_LANG && code == CBN_SELCHANGE) on_lang_picked();
@@ -2067,6 +2173,18 @@ static LRESULT CALLBACK wndproc(HWND w, UINT m, WPARAM wp, LPARAM lp) {
         delete c;
         return 0;
     }
+    case WM_NCCALCSIZE:   // no Windows frame or title bar: the launcher draws its own (paint_window)
+        if (wp) return 0;
+        break;
+    case WM_NCACTIVATE:
+        return DefWindowProcW(w, m, wp, -1);   // nothing to repaint in a frame that is not there
+    case WM_NCHITTEST: {   // the header is the title bar: drag the window by it
+        const LRESULT h = DefWindowProcW(w, m, wp, lp);
+        if (h != HTCLIENT) return h;
+        POINT p{(short)LOWORD(lp), (short)HIWORD(lp)};
+        ScreenToClient(w, &p);
+        return p.y < S(HEADER_H) ? HTCAPTION : HTCLIENT;
+    }
     case WM_CTLCOLORSTATIC: {
         HDC dc = (HDC)wp;
         const int id = GetDlgCtrlID((HWND)lp);
@@ -2079,6 +2197,8 @@ static LRESULT CALLBACK wndproc(HWND w, UINT m, WPARAM wp, LPARAM lp) {
         SetTextColor(dc, id == ID_FPS_HINT || id == ID_STATUS ? nx::MUTED : nx::TEXT);
         return (LRESULT)g_br_bg;
     }
+    case WM_CTLCOLORBTN:   // owner-drawn buttons erase with this before WM_DRAWITEM (else a light flash)
+        return (LRESULT)(g_ring_ids.count(GetDlgCtrlID((HWND)lp)) ? g_br_panel : g_br_bg);
     case WM_CTLCOLOREDIT:
     case WM_CTLCOLORLISTBOX: {
         HDC dc = (HDC)wp;
@@ -2215,9 +2335,10 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, LPWSTR, int show) {
     wc.hIcon = LoadIconW(nullptr, IDI_APPLICATION);
     RegisterClassExW(&wc);
 
+    // WS_CAPTION / WS_SYSMENU / WS_MINIMIZEBOX keep what a window does (taskbar minimise, Alt+F4, Aero snap, the
+    // shadow); WM_NCCALCSIZE takes the frame away, so the window is exactly its client area.
     const DWORD style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
     RECT r{0, 0, S(client_w()), S(client_h())};
-    AdjustWindowRect(&r, style, FALSE);
     HWND w = CreateWindowExW(0, wc.lpszClassName, L"Demon's Souls - PC port launcher", style, CW_USEDEFAULT,
                              CW_USEDEFAULT, r.right - r.left, r.bottom - r.top, nullptr, nullptr, inst, nullptr);
     if (!w) return 1;
@@ -2229,11 +2350,22 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, LPWSTR, int show) {
             set(w, 20, &dark, sizeof dark);            // DWMWA_USE_IMMERSIVE_DARK_MODE
             set(w, 35, &caption, sizeof caption);      // DWMWA_CAPTION_COLOR (Windows 11)
             set(w, 36, &text, sizeof text);            // DWMWA_TEXT_COLOR (Windows 11)
+            const int round = 2;                       // DWMWCP_ROUND
+            const COLORREF edge = nx::PANEL_EDGE;
+            set(w, 33, &round, sizeof round);          // DWMWA_WINDOW_CORNER_PREFERENCE (Windows 11)
+            set(w, 34, &edge, sizeof edge);            // DWMWA_BORDER_COLOR (Windows 11)
         }
     }
     ShowWindow(w, show);
     MSG msg;
     while (GetMessageW(&msg, nullptr, 0, 0) > 0) {
+        if (msg.message == WM_KEYDOWN && msg.wParam == VK_RETURN) {   // Enter on a focused button presses that button
+            const int f = GetDlgCtrlID(GetFocus());
+            if (GetParent(GetFocus()) == w && (g_links.count(f) || f == ID_WMIN || f == ID_WCLOSE)) {
+                SendMessageW(GetFocus(), BM_CLICK, 0, 0);
+                continue;
+            }
+        }
         if (IsDialogMessageW(w, &msg)) continue;
         TranslateMessage(&msg);
         DispatchMessageW(&msg);
