@@ -1645,8 +1645,11 @@ static void create_controls() {
     SendMessageW(g_tip, TTM_SETMAXTIPWIDTH, 0, S(360));
     SendMessageW(g_tip, TTM_SETDELAYTIME, TTDT_AUTOPOP, 30000);
 
-    const int L = 16, X = 112, W = 428;   // left edge, control column, full width
-    int y = 12 + banner_h() + 10;
+    // Two columns under the banner (settings left, switches right), PLAY and the buttons full width below.
+    const int L = 16, X = 112, W = 428, GAP = 24;   // left edge, control column, column width, column gap
+    const int CL = L + W + GAP, FW = 2 * W + GAP;   // the right column's left edge, the full width
+    const int y0 = 12 + banner_h() + 10;
+    int y = y0;
 
     label(L"Frame rate", L, y + 3, 92);
     HWND c = add(WC_COMBOBOXW, nullptr, CBS_DROPDOWNLIST | WS_TABSTOP | WS_VSCROLL, ID_FPS, X, y, 240, 200,
@@ -1699,25 +1702,27 @@ static void create_controls() {
         L"(the original files are kept and go back when you pick another language).");
     y += 34;
 
-    const int C2 = L + W / 2;
-    add(WC_BUTTONW, L"Start in fullscreen", BS_AUTOCHECKBOX | WS_TABSTOP | WS_GROUP, ID_FULLSCREEN, L, y, 200, 22,
+    const int yl = y;   // the left column ends here: Extra settings goes under it
+    y = y0;
+    const int C2 = CL + W / 2;
+    add(WC_BUTTONW, L"Start in fullscreen", BS_AUTOCHECKBOX | WS_TABSTOP | WS_GROUP, ID_FULLSCREEN, CL, y, 200, 22,
         L"Borderless fullscreen. Alt+Enter or F11 switches in the game.");
     add(WC_BUTTONW, L"Play movies", BS_AUTOCHECKBOX | WS_TABSTOP, ID_MOVIES, C2, y, 200, 22,
         L"The title logo, intro, story and ending movies. Untick to skip them.");
     y += 26;
-    add(WC_BUTTONW, L"God mode at start (F9)", BS_AUTOCHECKBOX | WS_TABSTOP, ID_GOD, L, y, 200, 22,
+    add(WC_BUTTONW, L"God mode at start (F9)", BS_AUTOCHECKBOX | WS_TABSTOP, ID_GOD, CL, y, 200, 22,
         L"You cannot die and HP, MP and stamina stay full. F9 turns it on and off in the game.");
     add(WC_BUTTONW, L"Record frame timing (F8)", BS_AUTOCHECKBOX | WS_TABSTOP, ID_RECORD, C2, y, 200, 22,
         L"Records frame timing while you play (about 25 MB an hour, no visible cost). Press F8 right after a "
         L"stutter; \"Report a problem\" packs it up for a GitHub issue.");
     y += 26;
-    add(WC_BUTTONW, L"Dump textures", BS_AUTOCHECKBOX | WS_TABSTOP, ID_DUMP, L, y, 200, 22,
+    add(WC_BUTTONW, L"Dump textures", BS_AUTOCHECKBOX | WS_TABSTOP, ID_DUMP, CL, y, 200, 22,
         L"Saves every texture the game draws to textures\\dump, for texture packs. Replacements in "
         L"textures\\replace always load. May stutter a little in new areas.");
     add(WC_BUTTONW, L"Keys by letter", BS_AUTOCHECKBOX | WS_TABSTOP, ID_LETTER, C2, y, 200, 22,
         L"Keys go by position (ZQSD on AZERTY moves like WASD). Tick this to go by the letter printed on the key.");
     y += 26;
-    add(WC_BUTTONW, L"Pin to the fastest CPU cores", BS_AUTOCHECKBOX | WS_TABSTOP, ID_PIN, L, y, 220, 22,
+    add(WC_BUTTONW, L"Pin to the fastest CPU cores", BS_AUTOCHECKBOX | WS_TABSTOP, ID_PIN, CL, y, 220, 22,
         L"On CPUs with two core groups (e.g. Ryzen X3D) the game runs on the group with the biggest cache. "
         L"Untick if your system manages that itself.");
     add(WC_BUTTONW, L"Keep my build after updates", BS_AUTOCHECKBOX | WS_TABSTOP, ID_NOREBUILD, C2, y, 220, 22,
@@ -1725,16 +1730,16 @@ static void create_controls() {
         L"you already have instead; the update's fixes then wait until you run BUILD.bat. An old build with new "
         L"files can misbehave (e.g. a black screen with movies on).");
     y += 26;
-    add(WC_BUTTONW, L"Skip the intro (straight to PRESS START)", BS_AUTOCHECKBOX | WS_TABSTOP, ID_SKIPINTRO, L, y, 320, 22,
+    add(WC_BUTTONW, L"Skip the intro (straight to PRESS START)", BS_AUTOCHECKBOX | WS_TABSTOP, ID_SKIPINTRO, CL, y, 320, 22,
         L"Confirms the autosave notice, fast-forwards the logos and skips the opening movie, so the game starts at "
         L"the title screen in a few seconds. The story movies later on still play.");
     y += 26;
-    add(WC_BUTTONW, L"My screen has G-Sync / FreeSync", BS_AUTOCHECKBOX | WS_TABSTOP, ID_VRR, L, y, 320, 22,
+    add(WC_BUTTONW, L"My screen has G-Sync / FreeSync", BS_AUTOCHECKBOX | WS_TABSTOP, ID_VRR, CL, y, 320, 22,
         L"Tick this if your monitor has G-Sync, FreeSync or another variable refresh rate (and it is on). The game "
         L"then lets the monitor follow its frames: 60 fps is smooth at any refresh rate. Without such a monitor "
         L"leave it off: the picture would tear.");
     y += 26;
-    add(WC_BUTTONW, L"Smooth GPU power (if your PC switches off)", BS_AUTOCHECKBOX | WS_TABSTOP, ID_GPUWARM, L, y, 320, 22,
+    add(WC_BUTTONW, L"Smooth GPU power (if your PC switches off)", BS_AUTOCHECKBOX | WS_TABSTOP, ID_GPUWARM, CL, y, 320, 22,
         L"Only if your PC switches itself off (or restarts) while the port runs but not in other games. The port's "
         L"GPU work comes in short bursts, and a big graphics card jumping between idle and full power many times a "
         L"second can trip a power supply. This fills the gaps with light GPU work so the power draw stays steady. "
@@ -1743,26 +1748,29 @@ static void create_controls() {
     y += 34;
 
     // QoL fixes: options that change how the original game plays (off by default), kept apart from the rest.
-    add(WC_BUTTONW, L"QoL Fixes (these change the original game)", BS_GROUPBOX, ID_QOL, L, y, W, 54);
-    add(WC_BUTTONW, L"Easy mode at start (F7)", BS_AUTOCHECKBOX | WS_TABSTOP | WS_GROUP, ID_EASY, L + 10, y + 22, 176, 22,
+    add(WC_BUTTONW, L"QoL Fixes (these change the original game)", BS_GROUPBOX, ID_QOL, CL, y, W, 54);
+    add(WC_BUTTONW, L"Easy mode at start (F7)", BS_AUTOCHECKBOX | WS_TABSTOP | WS_GROUP, ID_EASY, CL + 10, y + 22, 176, 22,
         L"Attacks that hit you take half as much HP. Falls, lava and poison may still do full damage. "
         L"F7 turns it on and off in the game (Windows); with god mode also on, god mode wins.");
-    add(WC_BUTTONW, L"OmniRoll: rolls follow the stick", BS_AUTOCHECKBOX | WS_TABSTOP, ID_OMNIROLL, L + 196, y + 22, 222, 22,
+    add(WC_BUTTONW, L"OmniRoll: rolls follow the stick", BS_AUTOCHECKBOX | WS_TABSTOP, ID_OMNIROLL, CL + 196, y + 22, 222, 22,
         L"Locked on, you roll exactly where the stick points instead of in one of 4 directions; unlocked diagonal "
         L"rolls no longer go the mirrored way. Stamina, i-frames and roll speed stay the game's own. "
         L"\"Omnidirectional Roll\" by hamzafallahi (Nexus Mods, Demon's Souls mod 192), built into the port.");
     y += 62;
 
+    const int yr = y;   // the right column ends here
+    y = yl;
     label(L"Extra settings", L, y + 3, 92);
     add(WC_EDITW, nullptr, WS_BORDER | WS_TABSTOP | ES_AUTOHSCROLL, ID_EXTRA, X, y, W - (X - L), 22,
         L"For testing, or when asked in an issue: NAME=value pairs separated by spaces, e.g. LD_PSO_ASYNC=0 "
         L"LD_SWAP_RESIZE=0. They are set last, so they win over the choices above.");
     y += 36;
+    y = std::max(y, yr);
 
-    c = add(WC_BUTTONW, L"PLAY", BS_DEFPUSHBUTTON | WS_TABSTOP | WS_GROUP, ID_PLAY, L, y, W, 46);
+    c = add(WC_BUTTONW, L"PLAY", BS_DEFPUSHBUTTON | WS_TABSTOP | WS_GROUP, ID_PLAY, L, y, FW, 46);
     SendMessageW(c, WM_SETFONT, (WPARAM)g_font_big, FALSE);
     y += 54;
-    const int bw = (W - 3 * 8) / 4;
+    const int bw = (FW - 3 * 8) / 4;
     add(WC_BUTTONW, L"Check for updates", BS_PUSHBUTTON | WS_TABSTOP, ID_UPDATE, L, y, bw, 28,
         L"Asks GitHub whether there is a newer version, shows what changed and installs it if you want, then rebuilds "
         L"(BUILD.bat). No git needed: a copy from a release ZIP gets the newest release.");
@@ -1773,10 +1781,16 @@ static void create_controls() {
     add(WC_BUTTONW, L"Folders \u25b4", BS_PUSHBUTTON | WS_TABSTOP, ID_FOLDERS, L + 3 * (bw + 8), y, bw, 28,
         L"Saves, logs, recordings, texture and model folders.");
     y += 36;
-    label(L"", L, y, W, 20, ID_STATUS);
+    label(L"", L, y, FW, 20, ID_STATUS);
 }
 
-static int client_h() { return 12 + banner_h() + 10 + 28 + 40 + 28 + 32 + 30 + 30 + 34 + 26 * 6 + 34 + 62 + 36 + 54 + 36 + 20 + 12; }
+// The height create_controls() uses: banner, the taller of the two columns, PLAY, the button row, the status line.
+static int client_h() {
+    const int left = 28 + 40 + 28 + 32 + 30 + 30 + 34 + 36;   // frame rate .. language, Extra settings
+    const int right = 26 * 6 + 34 + 62;                        // the switches, the QoL Fixes group
+    return 12 + banner_h() + 10 + (left > right ? left : right) + 54 + 36 + 20 + 12;
+}
+static int client_w() { return 16 + 428 + 24 + 428 + 16; }
 
 static LRESULT CALLBACK wndproc(HWND w, UINT m, WPARAM wp, LPARAM lp) {
     switch (m) {
@@ -1982,7 +1996,7 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, LPWSTR, int show) {
     RegisterClassExW(&wc);
 
     const DWORD style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
-    RECT r{0, 0, S(16 + 428 + 16), S(client_h())};
+    RECT r{0, 0, S(client_w()), S(client_h())};
     AdjustWindowRect(&r, style, FALSE);
     HWND w = CreateWindowExW(0, wc.lpszClassName, L"Demon's Souls - PC port launcher", style, CW_USEDEFAULT,
                              CW_USEDEFAULT, r.right - r.left, r.bottom - r.top, nullptr, nullptr, inst, nullptr);
