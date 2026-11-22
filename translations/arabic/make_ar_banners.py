@@ -14,13 +14,18 @@ import struct
 import sys
 
 import numpy as np
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, features
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, '..', 'demons-souls-recomp', 'tools'))
 sys.path.insert(0, os.path.join(HERE, '..', '..', 'tools'))
 import souls_formats as sf  # noqa: E402
+import arshape  # noqa: E402
+
+# Pillow joins and orders Arabic itself only with libraqm (Linux wheels; the Windows wheels lack FriBiDi). Without
+# it the text is shaped by arshape into presentation forms in visual order and drawn left to right.
+RAQM = features.check('raqm')
 
 NASKH = next(p for p in (os.path.join(HERE, 'fonts', 'NotoNaskhArabic.ttf'),
                          os.path.join(HERE, 'source', 'NotoNaskhArabic[wght].ttf')) if os.path.exists(p))
@@ -40,7 +45,7 @@ MARGIN = 12     # px kept free at the ends of an area
 
 
 def font(size):
-    f = ImageFont.truetype(NASKH, size, layout_engine=ImageFont.Layout.RAQM)
+    f = ImageFont.truetype(NASKH, size, layout_engine=ImageFont.Layout.RAQM if RAQM else ImageFont.Layout.BASIC)
     try:
         f.set_variation_by_axes([WGHT])
     except Exception:
@@ -74,7 +79,10 @@ def draw_area(rgb, x0, x1, text):
     W, H = (x1 - x0) * SS * 3, 128 * SS * 2
     big = Image.new('L', (W, H), 0)
     by = 128 * SS                                    # the baseline in big
-    ImageDraw.Draw(big).text((W // 2, by), text, font=f, fill=255, anchor='ms', direction='rtl', language='ar')
+    if RAQM:
+        ImageDraw.Draw(big).text((W // 2, by), text, font=f, fill=255, anchor='ms', direction='rtl', language='ar')
+    else:
+        ImageDraw.Draw(big).text((W // 2, by), arshape.layout(text), font=f, fill=255, anchor='ms')
     l, t, r, b = big.getbbox()
     room = ((x1 - x0) - 2 * MARGIN) * SS
     k = min(1.0, room / (r - l))
