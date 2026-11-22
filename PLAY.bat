@@ -16,6 +16,8 @@ rem God mode (fix 44): F9 in the game window turns it on / off (the window title
 rem you cannot die and HP, MP and stamina stay full. "set DES_GOD=1" before launching starts with it on.
 rem Easy mode (fix 164): F7 turns it on / off ([EASY MODE - F7] in the title): attacks that hit you
 rem take half as much HP. "set DES_EASY=1" starts with it on; "set DES_EASY_DAMAGE=70" makes it 70 percent.
+rem OmniRoll (fix 165): "set DES_OMNIROLL=1" makes locked-on rolls follow the stick at any angle ("Omnidirectional Roll" by
+rem hamzafallahi, Nexus Mods mod 192, built into the port).
 rem
 rem Every run is logged to logs\last_run_out.txt / last_run_err.txt (previous run kept as *_prev.txt).
 rem They grow by roughly 600 MB an hour. Attach the end of last_run_err.txt when you report a crash.

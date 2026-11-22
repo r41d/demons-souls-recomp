@@ -71,6 +71,7 @@ DEFAULTS = {
     'movies': True,
     'async_shaders': True,     # new shaders built in the background: brief pop-in instead of a stutter
     'skip_intro': False,
+    'omniroll': False,         # DES_OMNIROLL: locked-on rolls follow the stick (the OmniRoll mod, NOTES fix 165)
     'god': False,
     'easy': False,             # DES_EASY: attacks that hit the player take half the HP (NOTES fix 164)
     'gpu_clock': '800',        # Steam Deck: MHz or auto
@@ -165,7 +166,7 @@ def play_env(c, lang_env=None):
     e['DES_FULLSCREEN'] = '1' if c['fullscreen'] else '0'
     e['DES_MOVIES'] = '1' if c['movies'] else '0'
     e['DES_ASYNC_SHADERS'] = '1' if c['async_shaders'] else '0'
-    for k in ('DES_GAME', 'DES_BOSS_RUSH', 'DES_BR_SOULS', 'DES_SKIP_INTRO', 'DES_GOD', 'DES_EASY'):
+    for k in ('DES_GAME', 'DES_BOSS_RUSH', 'DES_BR_SOULS', 'DES_SKIP_INTRO', 'DES_GOD', 'DES_EASY', 'DES_OMNIROLL'):
         e.pop(k, None)
     if c['game'] == 'bossrush':
         e['DES_BOSS_RUSH'] = '1'
@@ -175,6 +176,8 @@ def play_env(c, lang_env=None):
         e['DES_GAME'] = c['game']
     if c['skip_intro']:
         e['DES_SKIP_INTRO'] = '1'
+    if c['omniroll']:
+        e['DES_OMNIROLL'] = '1'
     if c['god']:
         e['DES_GOD'] = '1'
     if c['easy']:
@@ -407,6 +410,7 @@ def main_window(steam=False):
         'movies': tk.BooleanVar(value=conf['movies']),
         'async_shaders': tk.BooleanVar(value=conf['async_shaders']),
         'skip_intro': tk.BooleanVar(value=conf['skip_intro']),
+        'omniroll': tk.BooleanVar(value=conf['omniroll']),
         'god': tk.BooleanVar(value=conf['god']),
         'easy': tk.BooleanVar(value=conf['easy']),
         'gpu_clock': tk.StringVar(value=conf['gpu_clock']),
@@ -486,8 +490,7 @@ def main_window(steam=False):
                      ('movies', 'Play movies'),
                      ('async_shaders', 'Compile new shaders in the background (brief pop-in instead of a stutter)'),
                      ('skip_intro', 'Skip the intro (straight to PRESS START)'),
-                     ('god', 'God mode at start'),
-                     ('easy', 'Easy mode: attacks that hit you take half as much HP')):
+                     ('god', 'God mode at start')):
         ttk.Checkbutton(opts, text=txt, variable=v[key]).grid(row=row, column=0, columnspan=2, sticky='w')
         row += 1
     if DECK:
@@ -496,6 +499,13 @@ def main_window(steam=False):
                      state='readonly').grid(row=row, column=1, sticky='w')
         row += 1
     opts.columnconfigure(1, weight=1)
+
+    # --- QoL fixes: options that change how the original game plays (off by default) ------------------------
+    qol = ttk.LabelFrame(body, text='QoL Fixes (these change the original game)', padding=10)
+    qol.pack(fill='x', pady=(10, 0))
+    for key, txt in (('easy', 'Easy mode at start: attacks that hit you take half as much HP'),
+                     ('omniroll', 'Locked-on rolls follow the stick (the OmniRoll mod by hamzafallahi)')):
+        ttk.Checkbutton(qol, text=txt, variable=v[key]).pack(anchor='w')
 
     def current():
         c = dict(conf)
