@@ -25,7 +25,7 @@ screenshots. Bug reports with a REPORT.bat zip are best as a GitHub issue. Thank
   yet, but very good in most areas. The full development log is [docs/NOTES.md](docs/NOTES.md).
 - **Android (arm64) is in an early phase.** It boots into the game and plays at 30 fps on a Pixel 10 Pro XL,
   with a controller or touch controls. The main target is the AYN Thor, which I don't own yet, so it is
-  untested there. See [Android](#android-experimental).
+  untested there. See [Android](#android-experimental). Due to some recent unexpected expenses, the AYN Thor testing has been put on hold for a while.
 
 Hit a stutter or crash? Press **F8** when it happens and run `REPORT.bat` afterwards
 ([details](#reporting-stutters-and-crashes)).
