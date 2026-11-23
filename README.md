@@ -19,7 +19,9 @@ screenshots. Bug reports with a REPORT.bat zip are best as a GitHub issue. Thank
   logo and movie, built from your own game files. Made with the help of **MrSuS60** and **zackcage6**, and reviewed
   by native speakers from the Discord. Pick it under **Language** in the launcher; see
   [Arabic translation](#arabic-translation-usa-disc-experimental).
-- **No online play yet.** Multiplayer comes once the game is optimised.
+- **Seamless co-op is being worked on.** Friends join your world without soul signs, stay through boss fights
+  and follow you between areas. The connection is confirmed working; the remaining bugs are being ironed out.
+  It isn't in a release yet.
 - **Plays smoothly on Windows, macOS and Linux.** The **Steam Deck** is playable too: not perfectly optimised
   yet, but very good in most areas. The full development log is [docs/NOTES.md](docs/NOTES.md).
 - **Android (arm64) is in an early phase.** It boots into the game and plays at 30 fps on a Pixel 10 Pro XL,
