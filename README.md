@@ -15,6 +15,10 @@ screenshots. Bug reports with a REPORT.bat zip are best as a GitHub issue. Thank
 - **The whole game is playable**, with sound, music and movies, on keyboard + mouse or an Xbox controller.
 - **60 fps** is recommended (50 on a 100 Hz screen). 30, uncapped and any custom rate work too. Above 60 fps
   there are still known bugs, such as the sound drifting out of sync.
+- **A custom Arabic translation** (USA disc): menus, items, dialogue and subtitles right to left, an Arabic title
+  logo and movie, built from your own game files. Made with the help of **MrSuS60** and **zackcage6**, and reviewed
+  by native speakers from the Discord. Pick it under **Language** in the launcher; see
+  [Arabic translation](#arabic-translation-usa-disc-experimental).
 - **No online play yet.** Multiplayer comes once the game is optimised.
 - **Plays smoothly on Windows, macOS and Linux.** The **Steam Deck** is playable too: not perfectly optimised
   yet, but very good in most areas. The full development log is [docs/NOTES.md](docs/NOTES.md).
