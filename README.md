@@ -16,8 +16,7 @@ screenshots. Bug reports with a REPORT.bat zip are best as a GitHub issue. Thank
 - **60 fps** is recommended (50 on a 100 Hz screen). 30, uncapped and any custom rate work too. Above 60 fps
   there are still known bugs, such as the sound drifting out of sync.
 - **A custom Arabic translation** (USA disc): menus, items, dialogue and subtitles right to left, an Arabic title
-  logo and movie, built from your own game files. Made with the help of **MrSuS60** and **zackcage6**, and reviewed
-  by native speakers from the Discord. Pick it under **Language** in the launcher; see
+  logo and movie, built from your own game files. Made with the help of **MrSuS60** and **zackcage6**, and other native speakers from the Discord. Pick it under **Language** in the launcher; see
   [Arabic translation](#arabic-translation-usa-disc-experimental).
 - **Seamless co-op is being worked on.** Friends join your world without soul signs, stay through boss fights
   and follow you between areas. The connection is confirmed working; the remaining bugs are being ironed out.
