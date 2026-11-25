@@ -1,15 +1,16 @@
-"""The Python half of mac/rebuild.sh: the steps that reuse the setup's own code (setup/setup.py).
-Run with the repository's venv Python, from the repository folder. Nothing here asks a question:
-whatever SETUP.bat would ask, this either decides the same way or stops with a message.
+"""The native builds' steps that reuse the setup's own code (setup/setup.py), run by setup/native_build.py
+(linux/native/build.sh, mac/rebuild.sh). Run with the repository's venv Python, from the repository folder.
+Nothing here asks a question: whatever SETUP.bat would ask, this either decides the same way or stops with a
+message.
 
-  python mac/setup_steps.py game <image.iso|image.zip|disc folder> [--key HEX|file.dkey]
+  python setup/steps.py game <image.iso|image.zip|disc folder> [--key HEX|file.dkey]
       the game files -> game/ (tools/iso_extract.py --all, then tools/udf_rename.py's real names;
       a dumped disc folder is hard-linked or copied), game/.extracted last. Already there: nothing.
-  python mac/setup_steps.py check-elf [--any]
+  python setup/steps.py check-elf [--any]
       game/PS3_GAME/USRDIR/EBOOT.elf against setup.py's EBOOT_ELF_SHA256 (--any: a warning only)
-  python mac/setup_steps.py toolkit     setup.step_ps3recomp(): deps/ps3recomp + this port's patch
-  python mac/setup_steps.py lift        setup.step_lift(): port/recompiled, port/spu + lifted-code.patch
-  python mac/setup_steps.py sync        update existing patches before an incremental build
+  python setup/steps.py toolkit     setup.step_ps3recomp(): deps/ps3recomp + this port's patch
+  python setup/steps.py lift        setup.step_lift(): port/recompiled, port/spu + lifted-code.patch
+  python setup/steps.py sync        update existing patches before an incremental build
 """
 import os
 import subprocess
@@ -137,7 +138,7 @@ def main(argv):
         lifted = patch_sync.sync_lifted(setup.lift_inputs())
         if runtime not in ('current', 'updated') or lifted not in ('current', 'updated'):
             fail('the toolkit or lifted code is incomplete or needs regenerating; '
-                 'run mac/rebuild.sh toolkit lift build')
+                 'run the toolkit, lift and build steps again')
     else:
         print(__doc__)
         return 2

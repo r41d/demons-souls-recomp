@@ -18,7 +18,8 @@ Everything it runs is the repository's own scripts (see `docs/MACOS.md`):
 | --- | --- |
 | `mac/install.sh` | the whole install, resumable: checks the disk, then every `mac/rebuild.sh` step |
 | `mac/rebuild.sh [step ...]` | `deps venv game decrypt toolkit lift build`, each announced as `==> <step>` |
-| `mac/setup_steps.py` | the steps that reuse `setup/setup.py` (game files, ELF check, toolkit, lift) |
+| `setup/native_build.py` | the steps themselves, shared with the native Linux build (`mac/rebuild.sh` runs it) |
+| `setup/steps.py` | the steps that reuse `setup/setup.py` (game files, ELF check, toolkit, lift, sync) |
 | `mac/env.sh` | the folders and tools the two shell scripts share |
 | `mac/play.sh` | the one way the game runs; Play sets its variables and calls it |
 | `tools/decrypt_self.py`, `tools/fetch_keys.py` | EBOOT.BIN -> EBOOT.elf without RPCS3 (from resistance-recomp) |
