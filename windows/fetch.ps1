@@ -1,7 +1,7 @@
 # SETUP.bat / BUILD.bat: download a pinned file, check its SHA-256 and unzip it -- for what is needed
 # before Python exists (the portable Python itself, and Git). Nothing is installed: it all stays in
 # the folder given (under deps\).
-#   powershell -NoProfile -ExecutionPolicy Bypass -File <kit>\setup\fetch.ps1 -Url <url> -Sha256 <hex> -Dest <abs dir> [-Name <text>]
+#   powershell -NoProfile -ExecutionPolicy Bypass -File <kit>\windows\fetch.ps1 -Url <url> -Sha256 <hex> -Dest <abs dir> [-Name <text>]
 # Paths are absolute and every file operation is literal (.NET, -LiteralPath): a folder named like
 # "Demon's Souls [BLUS-30443]" is a wildcard pattern to PowerShell's own path cmdlets. The archive is
 # unpacked into <Dest>.part and renamed to <Dest> only when complete, so an interrupted run never leaves

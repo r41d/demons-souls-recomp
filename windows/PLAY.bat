@@ -43,7 +43,8 @@ set "DS_RC=%errorlevel%"
 popd
 exit /b %DS_RC%
 :ds_local
-set "D=%~dp0"
+rem The kit's folder is the one above windows\ (PLAY.bat there starts this file).
+for %%I in ("%~dp0..") do set "D=%%~fI"
 if "%D:~-1%"=="\" set "D=%D:~0,-1%"
 set "PS3_TITLE=Demon's Souls (ps3recomp)"
 rem DES_GAME=<folder next to this file> picks the game files (default "game"); the PC Remaster mod copy
@@ -172,7 +173,7 @@ rem After an update (git pull, or a new ZIP unpacked over this folder) the game 
 rem BUILD.bat re-applies the patches that changed and recompiles. Until then this would run the OLD
 rem exe with the NEW settings -- e.g. movies on with an exe that cannot play them stays on a black
 rem screen (GitHub #4). A successful full build leaves a copy of the patches it was made from in
-rem port\build_opt\built (setup/build.py); when the folder's patches differ from those (or a build from
+rem port\build_opt\built (windows/build.py); when the folder's patches differ from those (or a build from
 rem before 2026-11-03 left none, or a rebuild failed or was stopped) the game was not rebuilt: build it
 rem now, then play. Only then -- an up-to-date folder starts straight away.
 rem (gotos, not ( ) blocks: a ")" in the folder's path would end a block.)
@@ -186,16 +187,16 @@ echo.
 echo This folder was updated: rebuilding the game first with BUILD.bat (a few minutes; only what
 echo changed is recompiled). The old build may not work with the new files.
 echo.
-call "%D%\BUILD.bat"
+call "%D%\windows\BUILD.bat"
 if errorlevel 1 goto build_failed
 goto play
 :stale_launcher
 rem The launcher runs this file without a window: rebuild in a window of its own and wait for it (the
 rem launcher keeps Play greyed out meanwhile), then start the game if the build is now current. The
 rem window closes by itself when the build works; when it fails it asks whether to play the build there is
-rem anyway (setup\rebuild_window.bat leaves logs\play_old_build.flag for a yes).
+rem anyway (windows\rebuild_window.bat leaves logs\play_old_build.flag for a yes).
 if exist "%D%\logs\play_old_build.flag" del "%D%\logs\play_old_build.flag"
-start "Demon's Souls - rebuilding after the update" /wait /d "%D%" cmd /c call "%D%\setup\rebuild_window.bat"
+start "Demon's Souls - rebuilding after the update" /wait /d "%D%" cmd /c call "%D%\windows\rebuild_window.bat"
 call :stale
 if not defined STALE goto play
 if not exist "%D%\logs\play_old_build.flag" exit /b 1

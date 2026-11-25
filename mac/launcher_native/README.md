@@ -1,6 +1,6 @@
 # DemonsSoulsLauncher.app
 
-The launcher window for the macOS build: the counterpart of `project/launcher/` (DemonsSoulsLauncher.exe).
+The launcher window for the macOS build: the counterpart of `windows/launcher/` (DemonsSoulsLauncher.exe).
 One file of plain AppKit (`launcher.m`), nothing to install.
 
 ```sh

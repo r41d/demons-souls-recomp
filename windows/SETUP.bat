@@ -13,7 +13,8 @@ set "DS_RC=%errorlevel%"
 popd
 exit /b %DS_RC%
 :ds_local
-cd /d "%~dp0"
+rem The kit's folder is the one above windows\ (where SETUP.bat, PLAY.bat ... start this file).
+cd /d "%~dp0.."
 set "KIT=%CD%"
 rem CMake treats [ ] in a path as a wildcard (its globs then find nothing) and cmd breaks on & in one:
 rem stop here with a clear message instead of failing later.
@@ -33,7 +34,7 @@ if not defined PY (
   where python >nul 2>nul && python -c "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)" >nul 2>nul && set "PY=python"
 )
 :portable_python
-if not defined PY if not exist "deps\python\tools\python.exe" call "%KIT%\setup\get_python.bat"
+if not defined PY if not exist "deps\python\tools\python.exe" call "%KIT%\windows\get_python.bat"
 if not defined PY if exist "deps\python\tools\python.exe" set "PY=deps\python\tools\python.exe"
 if not defined PY goto :need_python
 if defined DS_TEST_NO_GIT goto :portable_git
@@ -66,7 +67,7 @@ exit /b 0
 echo Git is not installed: downloading a portable one (Git for Windows' MinGit, 40 MB) into deps\mingit.
 echo Nothing is installed.
 pushd "%SystemRoot%"
-set "DS_FETCH=%KIT%\setup\fetch.ps1"
+set "DS_FETCH=%KIT%\windows\fetch.ps1"
 set "DS_DEST=%KIT%\deps\mingit"
 powershell -NoProfile -ExecutionPolicy Bypass -Command "& ([scriptblock]::Create([IO.File]::ReadAllText($env:DS_FETCH))) -Url 'https://github.com/git-for-windows/git/releases/download/v2.56.0.windows.4/MinGit-2.56.0.4-64-bit.zip' -Sha256 e3bf78351fe777fba47ddee5950082f8a98bb0f02604fdc7ba3ee2cb68ffa877 -Dest $env:DS_DEST -Name 'MinGit 2.56.0.4'; exit $LASTEXITCODE"
 popd

@@ -164,8 +164,8 @@ if __name__ == '__main__':
     if '--install' in sys.argv:   # its own console window: a click must not pause it
         try:
             sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-            import build
-            build.no_quickedit()
+            import buildutil
+            buildutil.no_quickedit()
         except Exception:
             pass
     a = sys.argv[1:]

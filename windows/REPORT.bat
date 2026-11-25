@@ -13,7 +13,8 @@ set "DS_RC=%errorlevel%"
 popd
 exit /b %DS_RC%
 :ds_local
-cd /d "%~dp0"
+rem The kit's folder is the one above windows\ (where SETUP.bat, PLAY.bat ... start this file).
+cd /d "%~dp0.."
 if not exist ".venv\Scripts\python.exe" (
   echo Run SETUP.bat first.
   pause

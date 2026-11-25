@@ -10,7 +10,7 @@
 //   DemonsSoulsLauncher.exe --play   starts the game with the saved settings (for a desktop shortcut)
 //
 // Plain Win32 + GDI+ (for the game's own ICON0.PNG banner), nothing to install. Built with the game
-// (project/launcher/CMakeLists.txt) and copied next to PLAY.bat.
+// (windows/launcher/CMakeLists.txt) and copied next to PLAY.bat.
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h>

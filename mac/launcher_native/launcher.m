@@ -1,5 +1,5 @@
 // DemonsSoulsLauncher.app -- one window for the play options of the Demon's Souls port on macOS.
-// The Mac counterpart of project/launcher/launcher.cpp (DemonsSoulsLauncher.exe): the same window, the
+// The Mac counterpart of windows/launcher/launcher.cpp (DemonsSoulsLauncher.exe): the same window, the
 // same launcher.ini next to the port, the same Controls window and the same four buttons.
 //
 // It keeps the choices in launcher.ini in the port's folder, sets the environment variables

@@ -15,15 +15,16 @@ builds without AVX2 on any CPU (for a copy meant for an older PC).
 On Linux (docs/LINUX.md) the same exe is cross-compiled: clang-cl + lld-link from LLVM, with the
 Microsoft C runtime and Windows SDK fetched on this PC by xwin (Microsoft's license is shown and
 accepted by you, nothing of it is shipped with this repo) and the C runtime linked statically so
-Wine/Proton needs no Visual C++ DLLs (setup/clang-cl-xwin.cmake). "set DS_XWIN=1" before BUILD.bat
+Wine/Proton needs no Visual C++ DLLs (windows/clang-cl-xwin.cmake). "set DS_XWIN=1" before BUILD.bat
 takes that path on Windows too, without Visual Studio.
 
 usage: BUILD.bat [--jobs N] [ninja targets...]
        build.py --runtime-only [--jobs N]   (cross toolchain: ps3recomp's runtime alone, no game needed)
 """
 import glob, hashlib, json, os, re, shutil, subprocess, sys, tarfile, tempfile, threading, time, urllib.request
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'setup'))
 import netcert                                                   # noqa: E402
+from buildutil import no_quickedit, cpu_ramp, job_cap, default_jobs   # noqa: E402,F401  (shared: setup/buildutil.py)
 netcert.install()   # HTTPS on a fresh Windows: let Windows fetch missing root certificates (netcert.py)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -48,90 +49,6 @@ LLVM_WIN_URL = ('https://github.com/llvm/llvm-project/releases/download/llvmorg-
 LLVM_WIN_SHA256 = '1a3f2f998e230b5791cc4e2bfe11a1f7c07fe42c96ff44f227c9db0bedfaf091'
 LLVM_WIN_TOOLS = ('clang-cl', 'lld-link', 'llvm-lib', 'llvm-rc', 'llvm-mt')
 PORTABLE_MARK = os.path.join(ROOT, 'deps', '.portable_compiler')
-
-
-def no_quickedit():
-    """Windows consoles with QuickEdit on (the default) pause any program that writes to them while text is selected
-    -- one stray click in the window and the setup or the build seems to hang until a key or a right-click ends the
-    selection. Turn it off for this window (the console's own setting, only this window)."""
-    if os.name != 'nt':
-        return
-    try:
-        import ctypes
-        k = ctypes.windll.kernel32
-        h = k.GetStdHandle(-10)   # STD_INPUT_HANDLE
-        mode = ctypes.c_uint32()
-        if h and k.GetConsoleMode(h, ctypes.byref(mode)):
-            # ENABLE_EXTENDED_FLAGS (0x80) must be set for the QuickEdit bit (0x40) to be changed
-            k.SetConsoleMode(h, (mode.value & ~0x40) | 0x80)
-    except (OSError, AttributeError, ValueError):
-        pass
-
-
-_RAMP = {'job': None, 'cores': None, 'gen': 0, 'off': False}
-
-
-def cpu_ramp(first=4, secs=6.0):
-    """Start the next heavy step (the lift's 32 workers, the 32 parallel compiles) on a few cores and widen to all of
-    them over `secs`, so the CPU's power draw rises over seconds instead of jumping from idle to full in an instant.
-    A PC whose power supply trips on sudden load steps switched itself off at the start of a lift (the GPU then had
-    the same problem: NOTES fix 203). Windows: this process and everything it starts are put in a job object once,
-    and the job's CPU affinity (which also moves processes already running) is widened step by step; the work and
-    its total time stay the same apart from the first seconds. DS_CPU_RAMP=0 turns it off; other systems: nothing."""
-    if os.name != 'nt' or _RAMP['off'] or os.environ.get('DS_CPU_RAMP') == '0':
-        return
-    try:
-        import ctypes
-        from ctypes import wintypes
-        k = ctypes.windll.kernel32
-
-        class BASIC(ctypes.Structure):   # JOBOBJECT_BASIC_LIMIT_INFORMATION
-            _fields_ = [('PerProcessUserTimeLimit', ctypes.c_int64), ('PerJobUserTimeLimit', ctypes.c_int64),
-                        ('LimitFlags', wintypes.DWORD), ('MinimumWorkingSetSize', ctypes.c_size_t),
-                        ('MaximumWorkingSetSize', ctypes.c_size_t), ('ActiveProcessLimit', wintypes.DWORD),
-                        ('Affinity', ctypes.c_size_t), ('PriorityClass', wintypes.DWORD),
-                        ('SchedulingClass', wintypes.DWORD)]
-
-        if _RAMP['job'] is None:
-            proc, system = ctypes.c_size_t(), ctypes.c_size_t()
-            k.GetCurrentProcess.restype = wintypes.HANDLE
-            me = wintypes.HANDLE(k.GetCurrentProcess())
-            if not k.GetProcessAffinityMask(me, ctypes.byref(proc), ctypes.byref(system)) or not proc.value:
-                raise OSError('no affinity mask')
-            cores = [1 << i for i in range(ctypes.sizeof(ctypes.c_size_t) * 8) if proc.value >> i & 1]
-            if len(cores) <= first:
-                _RAMP['off'] = True   # nothing to ramp on a small CPU
-                return
-            k.CreateJobObjectW.restype = wintypes.HANDLE
-            job = k.CreateJobObjectW(None, None)
-            if not job or not k.AssignProcessToJobObject(wintypes.HANDLE(job), me):
-                raise OSError('job object refused')
-            _RAMP['job'], _RAMP['cores'] = job, cores
-
-        job, cores = _RAMP['job'], _RAMP['cores']
-        _RAMP['gen'] += 1
-        gen = _RAMP['gen']
-
-        def set_cores(n):
-            info = BASIC()
-            info.LimitFlags = 0x10   # JOB_OBJECT_LIMIT_AFFINITY
-            info.Affinity = sum(cores[:n])
-            return k.SetInformationJobObject(wintypes.HANDLE(job), 2, ctypes.byref(info), ctypes.sizeof(info))
-
-        if not set_cores(first):
-            raise OSError('affinity refused')
-
-        def widen():
-            steps = 12
-            for i in range(1, steps + 1):
-                time.sleep(secs / steps)
-                if _RAMP['gen'] != gen:
-                    return   # a newer step started its own ramp
-                set_cores(max(first, round(first + (len(cores) - first) * i / steps)))
-
-        threading.Thread(target=widen, daemon=True).start()
-    except (OSError, AttributeError, ValueError, ctypes.ArgumentError):
-        _RAMP['off'] = True   # no job objects here (or nested jobs refused): run as before
 
 
 def say(msg=''):
@@ -238,7 +155,7 @@ def offer_portable(why):
         return False
     os.makedirs(os.path.dirname(PORTABLE_MARK), exist_ok=True)
     with open(PORTABLE_MARK, 'w') as f:
-        f.write('Build with the portable compiler: LLVM in deps/llvm + xwin in deps/xwin (setup/build.py).\n')
+        f.write('Build with the portable compiler: LLVM in deps/llvm + xwin in deps/xwin (windows/build.py).\n')
     return True
 
 
@@ -529,57 +446,6 @@ def xwin_sdk():
     return XWIN_DIR
 
 
-def job_cap():
-    """A per-PC limit on parallel work (compiles and the lift's workers): DS_MAX_JOBS, else "max_jobs" in
-    setup/local_config.json (this PC's own file, never in git or a release). For a PC whose power supply switches it
-    off under full CPU load: fewer threads at once means less power. None = no limit."""
-    v = os.environ.get('DS_MAX_JOBS')
-    if not v:
-        try:
-            with open(os.path.join(ROOT, 'setup', 'local_config.json')) as f:
-                v = json.load(f).get('max_jobs')
-        except (OSError, ValueError, AttributeError):
-            v = None
-    try:
-        return max(1, int(v)) if v else None
-    except (TypeError, ValueError):
-        return None
-
-
-def default_jobs():
-    """One compile per core, but no more than ~1 per 2.5 GB of free memory: the biggest lifted files need
-    about that much (a Steam Deck has 16 GB for 8 threads; Windows Sandbox gets every host thread but its own
-    RAM). Windows: 1 per 2 GB of installed RAM; Linux: 1 per 2.5 GB of MemAvailable."""
-    n = os.cpu_count() or 4
-    if os.name == 'nt':
-        try:
-            import ctypes
-
-            class MEMORYSTATUSEX(ctypes.Structure):
-                _fields_ = [('dwLength', ctypes.c_ulong), ('dwMemoryLoad', ctypes.c_ulong),
-                            ('ullTotalPhys', ctypes.c_ulonglong), ('ullAvailPhys', ctypes.c_ulonglong),
-                            ('ullTotalPageFile', ctypes.c_ulonglong), ('ullAvailPageFile', ctypes.c_ulonglong),
-                            ('ullTotalVirtual', ctypes.c_ulonglong), ('ullAvailVirtual', ctypes.c_ulonglong),
-                            ('ullAvailExtendedVirtual', ctypes.c_ulonglong)]
-            st = MEMORYSTATUSEX()
-            st.dwLength = ctypes.sizeof(st)
-            if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(st)):
-                # by installed RAM (2 GB per compile): the page file grows as needed and most files need far
-                # less than the biggest, so free memory right now would be too strict (a 64 GB PC: 32 jobs)
-                n = max(1, min(n, int(st.ullTotalPhys / (2 * 1024 ** 3))))
-        except (OSError, AttributeError, ValueError):
-            pass
-    else:
-        try:
-            with open('/proc/meminfo') as f:
-                kb = next(int(l.split()[1]) for l in f if l.startswith('MemAvailable:'))
-            n = max(1, min(n, int(kb / (2.5 * 1024 * 1024))))
-        except (OSError, StopIteration, ValueError):
-            pass
-    cap = job_cap()
-    return min(n, cap) if cap else n
-
-
 def build_xwin(jobs=None, targets=(), runtime_only=False):
     """runtime_only: just ps3recomp's runtime library (deps/ps3recomp on its own, port/build_runtime),
     no game code -- a quick check of the toolchain that needs no disc (the Linux CI job runs it)."""
@@ -609,7 +475,7 @@ def build_xwin(jobs=None, targets=(), runtime_only=False):
     env = dict(os.environ, INCLUDE=';'.join(inc), LIB=';'.join(lib))
     env.pop('EXTERNAL_INCLUDE', None)
     jobs = int(jobs or default_jobs())
-    toolchain = fwd(os.path.join(ROOT, 'setup', 'clang-cl-xwin.cmake'))
+    toolchain = fwd(os.path.join(ROOT, 'windows', 'clang-cl-xwin.cmake'))
     bdir = os.path.join(ROOT, 'port', 'build_runtime') if runtime_only else BUILD
     cache = os.path.join(bdir, 'CMakeCache.txt')
     if os.path.isfile(cache) and toolchain not in open(cache, errors='replace').read():
@@ -823,7 +689,7 @@ def finish(rc, avx2, full=True):
                 os.remove(marker)
         else:
             with open(marker, 'w') as f:
-                f.write('Built without AVX2 (setup/build.py); PLAY.bat does not require it.\n')
+                f.write('Built without AVX2 (windows/build.py); PLAY.bat does not require it.\n')
         say(f'\n  built {os.path.join(BUILD, "DemonsSoulsRecomp.exe")}')
         kbm_icons()
     return rc

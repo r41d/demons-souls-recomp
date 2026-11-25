@@ -11,7 +11,8 @@ set "DS_RC=%errorlevel%"
 popd
 exit /b %DS_RC%
 :ds_local
-cd /d "%~dp0"
+rem The kit's folder is the one above windows\ (where SETUP.bat, PLAY.bat ... start this file).
+cd /d "%~dp0.."
 rem CMake treats [ ] in a path as a wildcard (its globs then find nothing) and cmd breaks on & in one:
 rem stop here with a clear message instead of failing later.
 set "DS_P=%CD%"
@@ -28,7 +29,7 @@ if exist "deps\mingit\cmd\git.exe" set "PATH=%CD%\deps\mingit\cmd;%PATH%"
 rem The Python that made .venv may have been removed or upgraded since ("No Python at ..."): then make
 rem .venv again with the Python installed now.
 ".venv\Scripts\python.exe" -c "" >nul 2>nul || call :remake_venv || exit /b 1
-".venv\Scripts\python.exe" setup\build.py %*
+".venv\Scripts\python.exe" windows\build.py %*
 exit /b %errorlevel%
 
 :remake_venv
@@ -39,7 +40,7 @@ if not defined PY (
   where python >nul 2>nul && python -c "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)" >nul 2>nul && set "PY=python"
 )
 rem Neither (Python was uninstalled after SETUP): the same portable one SETUP.bat downloads.
-if not defined PY if not exist "deps\python\tools\python.exe" call "%CD%\setup\get_python.bat"
+if not defined PY if not exist "deps\python\tools\python.exe" call "%CD%\windows\get_python.bat"
 if not defined PY if exist "deps\python\tools\python.exe" set "PY=deps\python\tools\python.exe"
 if not defined PY goto :no_python
 rmdir /s /q ".venv"

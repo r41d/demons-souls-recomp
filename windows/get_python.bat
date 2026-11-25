@@ -10,7 +10,7 @@ if not exist "%KIT%\deps" mkdir "%KIT%\deps"
 echo No Python 3.10 or newer is installed: downloading a portable one (python.org's own build, 15 MB) into
 echo deps\python. Nothing is installed.
 pushd "%SystemRoot%"
-set "DS_FETCH=%KIT%\setup\fetch.ps1"
+set "DS_FETCH=%KIT%\windows\fetch.ps1"
 set "DS_DEST=%KIT%\deps\python"
 powershell -NoProfile -ExecutionPolicy Bypass -Command "& ([scriptblock]::Create([IO.File]::ReadAllText($env:DS_FETCH))) -Url 'https://api.nuget.org/v3-flatcontainer/python/3.13.17/python.3.13.17.nupkg' -Sha256 dce409744b088f94c6e37ba41f8100c384c27e029e843237364c602d30d475e5 -Dest $env:DS_DEST -Name 'Python 3.13.17'; exit $LASTEXITCODE"
 popd

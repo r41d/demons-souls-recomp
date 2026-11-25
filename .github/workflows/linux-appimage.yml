@@ -4,9 +4,9 @@ name: Linux AppImage (tools only)
 
 on:
   push:
-    paths: [linux/**, setup/**, tools/**, patches/**, project/**, .github/workflows/linux-appimage.yml]
+    paths: [linux/**, setup/**, tools/**, patches/**, project/**, windows/**, .github/workflows/linux-appimage.yml]
   pull_request:
-    paths: [linux/**, setup/**, tools/**, patches/**, project/**, .github/workflows/linux-appimage.yml]
+    paths: [linux/**, setup/**, tools/**, patches/**, project/**, windows/**, .github/workflows/linux-appimage.yml]
   release:
     types: [published]   # the AppImage and its sources tar are attached to the release (step at the end)
   workflow_dispatch:
@@ -90,7 +90,7 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: build-appimage/cache
-          key: appimage-downloads-${{ hashFiles('linux/appimage/build-appimage.sh', 'setup/build.py') }}
+          key: appimage-downloads-${{ hashFiles('linux/appimage/build-appimage.sh', 'windows/build.py') }}
           restore-keys: appimage-downloads-
       - name: Build the AppImage
         env:

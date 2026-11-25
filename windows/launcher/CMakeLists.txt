@@ -1,7 +1,7 @@
 # DemonsSoulsLauncher.exe: the settings window that starts the game through PLAY.bat (launcher.cpp).
 # Plain Win32 + GDI+, nothing to install. Built with the game and copied next to PLAY.bat, where it
 # finds the game and keeps launcher.ini. Also builds on its own (a quick test of the window):
-#   cmake -S project/launcher -B <dir> -G Ninja && ninja -C <dir>
+#   cmake -S windows/launcher -B <dir> -G Ninja && ninja -C <dir>
 cmake_minimum_required(VERSION 3.21)
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     project(DemonsSoulsLauncher LANGUAGES CXX)

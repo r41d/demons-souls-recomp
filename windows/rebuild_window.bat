@@ -5,7 +5,7 @@ rem that is already there anyway; a yes leaves logs\play_old_build.flag for PLAY
 rem or play the old build, 1 = stop.
 setlocal
 set "R=%~dp0.."
-call "%R%\BUILD.bat"
+call "%R%\windows\BUILD.bat"
 if not errorlevel 1 exit /b 0
 echo.
 echo The rebuild did not finish: the messages above say why (logs\build_last.txt has the compiler's full

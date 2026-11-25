@@ -11,7 +11,7 @@ the game's own button art. Nothing from the game is in this script.
 The keys are your bindings (fix 103): the launcher's Controls window keeps them in launcher.ini [controls]
 (the defaults are the souls layout), and each cell shows the key its button is bound to. keys.txt in the output
 folder records the bindings drawn; --if-stale only draws again when they or the art (VERSION) changed -- the
-launcher runs that before Play, BUILD.bat after a build (setup/build.py kbm_icons). By hand:
+launcher runs that before Play, BUILD.bat after a build (windows/build.py kbm_icons). By hand:
     .venv\\Scripts\\python.exe tools\\kbm_icons.py [<game>\\PS3_GAME\\USRDIR] [<out folder>] [--preview] [--if-stale]
 defaults game\\PS3_GAME\\USRDIR and textures\\kbm next to this repo. Needs Pillow (pip install Pillow).
 --preview also writes <out>\\preview.png: each atlas's original cells above the new ones, 4x.

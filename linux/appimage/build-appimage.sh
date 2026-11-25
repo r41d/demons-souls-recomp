@@ -3,7 +3,7 @@
 #
 # TOOLS ONLY. It holds a relocatable Python (python-appimage) with cryptography/CMake/Ninja, clang-cl +
 # lld-link + llvm-lib + llvm-rc from LLVM's own Linux release, xwin, a fallback git, and this repo's
-# setup/, tools/, patches/, project/, linux/ and docs/. Never game files, the EBOOT, recompiled code,
+# setup/, tools/, patches/, project/, windows/, linux/ and docs/. Never game files, the EBOOT, recompiled code,
 # keys, firmware, saves, shader caches, RPCS3, Proton or Microsoft's CRT/SDK: the player's PC gets those
 # itself (docs/LINUX.md). check_payload below refuses to package anything that looks like them.
 #
@@ -27,7 +27,7 @@ APPDIR=$WORK/AppDir
 LLVM_VERSION=${LLVM_VERSION:-23.1.3}         # the tested Windows build's clang
 PY_SERIES=python3.12
 APPIMAGETOOL_VERSION=1.9.1
-XWIN_VERSION=$(sed -n "s/^XWIN_VERSION = '\(.*\)'/\1/p" "$REPO/setup/build.py")
+XWIN_VERSION=$(sed -n "s/^XWIN_VERSION = '\(.*\)'/\1/p" "$REPO/windows/build.py")
 SHARE=$APPDIR/usr/share/demons-souls-recomp
 ORIGINS=$WORK/origins.txt   # every system file copied into the AppImage, for collect_sources
 
@@ -186,7 +186,7 @@ cp "$SRC/SOURCES.txt" "$LIC/SOURCES.txt"
 say "this repo's scripts and patches"
 mkdir -p "$SHARE"
 (cd "$REPO" && git ls-files -z --cached --others --exclude-standard -- \
-    setup tools patches project linux docs README.md LICENSE .gitattributes) |
+    setup tools patches project windows linux docs README.md LICENSE .gitattributes) |
   while IFS= read -r -d '' f; do
     [ -f "$REPO/$f" ] || continue
     mkdir -p "$SHARE/$(dirname "$f")"

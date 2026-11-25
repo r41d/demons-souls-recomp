@@ -324,10 +324,12 @@ Packs and models are the game's art; share them only where that is allowed.
 ## Repo layout
 
 ```
-SETUP.bat / BUILD.bat        one-time setup / rebuild
-DemonsSoulsLauncher.exe      the settings window (source in project/launcher/)
-PLAY.bat / REPORT.bat        start the game / pack a bug report
-setup/                       setup pipeline, toolchain finder, Linux cross toolchain
+SETUP.bat / BUILD.bat        one-time setup / rebuild (they run windows\SETUP.bat / BUILD.bat)
+DemonsSoulsLauncher.exe      the settings window (source in windows/launcher/)
+PLAY.bat / REPORT.bat        start the game / pack a bug report (windows\PLAY.bat / REPORT.bat)
+windows/                     Windows: the scripts above, the exe's build (build.py: Visual Studio / LLVM, or
+                             cross-compiled from Linux with xwin), the launcher's source
+setup/                       setup pipeline shared by every system (setup.py, patch sync, the updater)
 project/                     CMake project
 patches/                     ps3recomp-local.patch (runtime, on ps3recomp @ 4e8f3ca) and lifted-code.patch (game code)
 tools/                       disc extraction, SPU lifting, perf report, mod installer, model tool

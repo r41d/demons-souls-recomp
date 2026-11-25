@@ -70,7 +70,7 @@ echo "Works on Linux (tested on Ubuntu 24.04) and the Steam Deck (slow loads, no
 echo "Please report how it goes on GitHub (docs/LINUX.md, \"For testers\")."
 
 case "$cmd" in
-  build) "$DS_PYTHON" setup/build.py "$@"; rc=$?; pause; exit $rc ;;
+  build) "$DS_PYTHON" windows/build.py "$@"; rc=$?; pause; exit $rc ;;
   play) exec sh linux/play.sh "$@" ;;
 esac
 "$DS_PYTHON" setup/setup.py "$@"

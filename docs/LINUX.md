@@ -106,7 +106,7 @@ Open a GitHub issue with that. Known unknowns, roughly in the order they may bit
 
 - On Windows: the whole Linux build path except the operating system itself: Microsoft's CRT and SDK
   fetched by xwin (no Visual Studio), the game code lifted from the EBOOT, and `DemonsSoulsRecomp.exe`
-  built with clang-cl + lld-link and a static C runtime (`setup/build.py` with `DS_XWIN=1`). That exe
+  built with clang-cl + lld-link and a static C runtime (`windows/build.py` with `DS_XWIN=1`). That exe
   imports no Visual C++ runtime DLLs, only Windows system ones that Proton provides.
 - On GitHub Actions (Ubuntu, `.github/workflows/linux-appimage.yml`): the AppImage is built and its
   self-test run on Ubuntu and in bare Debian and Arch Linux containers (no Python, git or compiler
@@ -134,10 +134,10 @@ Open a GitHub issue with that. Known unknowns, roughly in the order they may bit
   that sources file alongside it.
 - `linux/appimage/AppRun` copies the kit's scripts into the data folder and runs `setup/setup.py` there,
   then `linux/play.sh`. `selftest` checks the bundled tools (`linux/selftest.py`).
-- `setup/build.py` cross-compiles when not on Windows (or with `DS_XWIN=1` on Windows): toolchain file
-  `setup/clang-cl-xwin.cmake`, the SDK from `xwin splat --use-winsysroot-style` in `deps/xwin`, found
+- `windows/build.py` cross-compiles when not on Windows (or with `DS_XWIN=1` on Windows): toolchain file
+  `windows/clang-cl-xwin.cmake`, the SDK from `xwin splat --use-winsysroot-style` in `deps/xwin`, found
   through the `INCLUDE` / `LIB` environment variables, the C runtime linked statically (`/MT`) so Wine
-  needs no Visual C++ DLLs, and no manifest step. `setup/build.py --runtime-only` builds just
+  needs no Visual C++ DLLs, and no manifest step. `windows/build.py --runtime-only` builds just
   ps3recomp's runtime library (no disc needed).
 - `linux/play.sh` sets the same variables as `PLAY.bat` (paths as `Z:\...` for the Windows program) and
   runs the exe through umu-launcher (`umu-run`), a Proton folder, or Wine.

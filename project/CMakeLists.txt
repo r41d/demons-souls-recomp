@@ -203,7 +203,7 @@ endif()
 # thread's stack at 8s/15s -- WATCHDOG_AT="a,b" moves them -- crash filter,
 # PS3_GUEST_PROF sampler) instead of the template's lean main.cpp.
 option(DS_BOOT_HARNESS "Build with runtime/ppu/tests/boot_main.cpp" OFF)
-option(DS_AVX2 "Build the lifted SPU code for AVX2 (setup/build.py turns it off on CPUs without it)" ON)
+option(DS_AVX2 "Build the lifted SPU code for AVX2 (windows/build.py turns it off on CPUs without it)" ON)
 if(DS_BOOT_HARNESS)
     set(DS_RUNNER "${PS3RECOMP_DIR}/runtime/ppu/tests/boot_main.cpp")
 else()
@@ -414,12 +414,12 @@ foreach(u IN LISTS DS_PPU_O2_UNITS)
 endforeach()
 
 # ---------------------------------------------------------------------------
-# DemonsSoulsLauncher.exe (launcher/): the settings window, copied next to
+# DemonsSoulsLauncher.exe (windows/launcher/): the settings window, copied next to
 # PLAY.bat. Windows hosts only (also with DS_XWIN=1): Linux plays through
 # linux/play.sh.
 # ---------------------------------------------------------------------------
 if(WIN32 AND CMAKE_HOST_WIN32)
-    add_subdirectory(launcher)
+    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../windows/launcher" "${CMAKE_BINARY_DIR}/launcher")
 endif()
 
 # ---------------------------------------------------------------------------

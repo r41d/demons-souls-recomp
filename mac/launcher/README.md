@@ -9,7 +9,7 @@ plain flame drawn by `scripts/make_icon.py`.
 
 It is the Resistance 2 port's launcher adapted to this game, by way of the PES 2013 one (its in-app
 install flow, trophy list and picture controls). The UI is in Brazilian Portuguese by default, with
-English in the sidebar. The Windows build has its own launcher (`project/launcher/`); this one is
+English in the sidebar. The Windows build has its own launcher (`windows/launcher/`); this one is
 macOS only.
 
 Everything it runs is the repository's own scripts (see `docs/MACOS.md`):

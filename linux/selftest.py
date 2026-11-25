@@ -5,12 +5,12 @@ Needs no disc and downloads nothing by default:
   - clang-cl + lld-link + llvm-lib: compiles a small C file for Windows and links it into a DLL
     (no Microsoft SDK needed for that)
   - xwin, git (git apply of a small patch)
-  - every Python file of setup/, tools/ and linux/ compiles
+  - every Python file of setup/, tools/, windows/ and linux/ compiles
 
 --cross-runtime [folder]: also the real thing without a disc: ps3recomp at the tested commit with
 patches/ps3recomp-local.patch, the Microsoft CRT/SDK from xwin (xwin asks to accept Microsoft's license
 unless XWIN_ACCEPT_LICENSE=true is set), and ps3recomp's runtime library cross-compiled
-(setup/build.py --runtime-only). In a copy of this kit in [folder] (default: a temporary one).
+(windows/build.py --runtime-only). In a copy of this kit in [folder] (default: a temporary one).
 
 usage: selftest.py [--cross-runtime [folder]]
 """
@@ -18,6 +18,7 @@ import os, shutil, subprocess, sys, tempfile
 
 KIT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(KIT, 'setup'))
+sys.path.insert(0, os.path.join(KIT, 'windows'))   # build.py: the Windows exe's build, cross-compiled here
 import build                                                    # noqa: E402
 
 results = []
@@ -105,7 +106,7 @@ def git():
 
 def scripts():
     n = 0
-    for sub in ('setup', 'tools', 'linux'):
+    for sub in ('setup', 'tools', 'windows', 'linux'):
         for dp, _, fs in os.walk(os.path.join(KIT, sub)):
             for f in fs:
                 if f.endswith('.py'):
@@ -119,7 +120,7 @@ def scripts():
 def cross_runtime(folder):
     def fn():
         work = folder or tempfile.mkdtemp(prefix='ds_selftest_')
-        for sub in ('setup', 'tools', 'patches', 'project', 'linux'):
+        for sub in ('setup', 'tools', 'patches', 'project', 'windows', 'linux'):
             shutil.copytree(os.path.join(KIT, sub), os.path.join(work, sub), dirs_exist_ok=True,
                             ignore=shutil.ignore_patterns('__pycache__', 'local_config.json'))
         env = dict(os.environ, DS_SETUP_NAME='selftest')
@@ -127,7 +128,7 @@ def cross_runtime(folder):
         r = subprocess.run([sys.executable, '-c', code], cwd=work, env=env)
         if r.returncode:
             raise RuntimeError('ps3recomp checkout / patch failed')
-        r = subprocess.run([sys.executable, os.path.join(work, 'setup', 'build.py'), '--runtime-only'],
+        r = subprocess.run([sys.executable, os.path.join(work, 'windows', 'build.py'), '--runtime-only'],
                            cwd=work, env=env)
         if r.returncode:
             raise RuntimeError(f'runtime cross-build failed (in {work})')

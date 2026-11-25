@@ -10,20 +10,20 @@ update of this repo, steps 3 and 5 re-apply the patches that changed (setup/patc
   3. fetch ps3recomp at the tested commit + our patches   -> deps/ps3recomp
   4. recompile the game's PPU and SPU code to C/C++       -> port/recompiled, port/spu
   5. apply this port's edits to the recompiled code       (patches/lifted-code.patch; Europe: lifted-code-eu.patch)
-  6. build DemonsSoulsRecomp.exe                          -> port/build_opt (setup/build.py)
+  6. build DemonsSoulsRecomp.exe                          -> port/build_opt (windows/build.py)
 
 usage: SETUP.bat [image.iso | image.zip | dumped disc folder] [--key HEX | --key file.dkey]
                  [--rpcs3 path\\to\\rpcs3.exe] [--jobs N]
 
 On Linux the same steps run from linux/setup.sh or the AppImage (docs/LINUX.md); step 2's fallback
-is RPCS3's Linux AppImage and step 6 cross-compiles the Windows exe (setup/build.py).
+is RPCS3's Linux AppImage and step 6 cross-compiles the Windows exe (windows/build.py).
 """
 import glob, hashlib, json, os, shutil, subprocess, sys, urllib.parse, urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, 'tools'))
 sys.path.insert(0, os.path.join(ROOT, 'setup'))
-import build                                                    # noqa: E402
+import buildutil                                                # noqa: E402  (windows/build.py only in step 6)
 import patch_sync                                               # noqa: E402
 import region                                                   # noqa: E402
 
@@ -137,7 +137,7 @@ def save_config(cfg):
 
 def run(cmd, cwd=None, log=None):
     say('  > ' + ' '.join(os.path.basename(c) if i == 0 else c for i, c in enumerate(cmd)))
-    build.cpu_ramp()   # the lift's workers start on a few cores, all of them a few seconds later
+    buildutil.cpu_ramp()   # the lift's workers start on a few cores, all of them a few seconds later
     if log:
         with open(log, 'w') as f:
             r = subprocess.run(cmd, cwd=cwd, stdout=f, stderr=subprocess.STDOUT)
@@ -693,7 +693,7 @@ def step_lift():
     say('  lifting 94,000 PPU functions (about a minute or two)...')
     run([py, os.path.join(T, 'ppu_lifter.py'), 'game/EBOOT.ELF', '--functions', 'out/EBOOT.functions.json',
          '--hle-stubs', 'out/EBOOT.imports.json', *LIFT_ARGS, '--output', 'recompiled/',
-         '--jobs', str(build.default_jobs())], PORT,
+         '--jobs', str(buildutil.default_jobs())], PORT,
         os.path.join(logs, 'ppu_lifter.log'))
     run([py, os.path.join(T, 'extract_spu_images.py'), 'game/EBOOT.ELF', '--output', 'spu/images'], PORT,
         os.path.join(logs, 'spu_extract.log'))
@@ -747,7 +747,7 @@ def long_path_warning():
 
 
 def main():
-    build.no_quickedit()   # a click in the window must not pause the setup
+    buildutil.no_quickedit()   # a click in the window must not pause the setup
     long_path_warning()
     args, a = {}, sys.argv[1:]
     while a:
@@ -769,6 +769,8 @@ def main():
     step(6, 'build DemonsSoulsRecomp.exe (the first build takes a while: 10-30 minutes)')
     for d in ('hdd0', 'hdd1', 'no_flash', 'logs'):
         os.makedirs(os.path.join(ROOT, d), exist_ok=True)
+    sys.path.insert(0, os.path.join(ROOT, 'windows'))
+    import build   # windows/build.py: the Windows exe (natively, or cross-compiled on Linux)
     if build.build(jobs=args.get('jobs')):
         fail('the build failed -- see the messages above')
     say('\nAll done. ' + PLAY_HINT)
