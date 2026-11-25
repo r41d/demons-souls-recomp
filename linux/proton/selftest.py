@@ -16,7 +16,7 @@ usage: selftest.py [--cross-runtime [folder]]
 """
 import os, shutil, subprocess, sys, tempfile
 
-KIT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+KIT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(KIT, 'setup'))
 import build                                                    # noqa: E402
 

@@ -1,8 +1,8 @@
 #!/bin/sh
 # Launches Demon's Souls (BLUS-30443, ps3recomp static recompilation) on Linux / Steam Deck: the
-# Windows build linux/setup.sh (or the AppImage) made, run through Proton, whose vkd3d-proton turns the
+# Windows build linux/proton/setup.sh (or the AppImage) made, run through Proton, whose vkd3d-proton turns the
 # port's Direct3D 12 renderer into Vulkan. Same settings as PLAY.bat (read that for what each one does);
-# this file only adds what Linux needs. docs/LINUX.md has the details and the list of open questions.
+# this file only adds what Linux needs. docs/LINUX_PROTON.md has the details and the list of open questions.
 #
 # Which Proton (DS_RUNNER picks one by hand: umu, proton or wine):
 #   umu   -- umu-launcher (open source, runs Proton outside Steam and downloads UMU-Proton itself on the
@@ -18,7 +18,7 @@
 #              DES_GAME, DES_BOSS_RUSH=1, DES_RECORD=0, DES_GOD=1, DES_EASY=1, DES_OMNIROLL=1, DES_MANA_REGEN=1 -- all as in PLAY.bat.
 #              DES_FULLSCREEN=0|1 (a Steam Deck defaults to 1: borderless full screen).
 set -u
-D=$(cd "$(dirname "$0")/.." && pwd)
+D=$(cd "$(dirname "$0")/../.." && pwd)
 cd "$D"
 PY=${DS_PYTHON:-python3}
 UMU_VERSION=1.4.4
@@ -28,7 +28,7 @@ die() { echo "$*"; exit 1; }
 winpath() { printf 'Z:%s' "$1" | sed 's|/|\\|g'; }
 
 EXE="${DS_EXE:-$D/port/build_opt/DemonsSoulsRecomp.exe}"   # DS_EXE=<path>: run another build (A/B tests)
-[ -f "$EXE" ] || die "DemonsSoulsRecomp.exe is not built yet. Run linux/setup.sh (or the AppImage) first."
+[ -f "$EXE" ] || die "DemonsSoulsRecomp.exe is not built yet. Run linux/proton/setup.sh (or the AppImage) first."
 
 # --- which Proton ------------------------------------------------------------------------------
 PFX="${DS_PREFIX:-$D/wineprefix}"   # DS_PREFIX=<dir>: another Wine prefix (e.g. to try a different Proton)
@@ -59,7 +59,7 @@ if [ -z "$RUNNER" ]; then
   if [ -n "${PROTON:-}" ]; then RUNNER=proton
   elif find_umu >/dev/null; then RUNNER=umu
   elif get_umu; then RUNNER=umu
-  else die "No Proton to run the game with: install umu-launcher, or set PROTON=/path/to/Proton (docs/LINUX.md)."
+  else die "No Proton to run the game with: install umu-launcher, or set PROTON=/path/to/Proton (docs/LINUX_PROTON.md)."
   fi
 fi
 # run_win <exe> <args...>: one Windows program in the game's prefix
@@ -111,7 +111,7 @@ if [ "${DES_BOSS_RUSH:-}" = 1 ]; then
   "$BR_PY" "$D/tools/make_boss_rush.py" ||
     die "Boss rush: game_bossrush could not be made from your game files (the messages above say why)."
 fi
-[ -f "$D/$DES_GAME/PS3_GAME/USRDIR/EBOOT.elf" ] || die "No $DES_GAME/PS3_GAME/USRDIR/EBOOT.elf. Run linux/setup.sh first."
+[ -f "$D/$DES_GAME/PS3_GAME/USRDIR/EBOOT.elf" ] || die "No $DES_GAME/PS3_GAME/USRDIR/EBOOT.elf. Run linux/proton/setup.sh first."
 export PS3_HDD0_ROOT="$(winpath "$D/hdd0")"
 export PS3_HDD1_ROOT="$(winpath "$D/hdd1")"
 export RSX_LIVE_DRAW=1 GCM_NO_TITLE_RECYCLE=1 PS3_NP_STRICT_OFFLINE=1 SPU_INTERP_UNLIFTED=1 SPURS_JC_EVENTS=0
@@ -252,6 +252,6 @@ CODE=$?
 if [ "$CODE" != 0 ]; then
   echo
   echo "Demon's Souls exited with code $CODE. The logs are in logs/last_run_*.txt."
-  echo "Please report what happened on GitHub (docs/LINUX.md says what helps)."
+  echo "Please report what happened on GitHub (docs/LINUX_PROTON.md says what helps)."
 fi
 exit "$CODE"

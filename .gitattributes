@@ -8,4 +8,4 @@
 *.sh    text eol=lf
 *.cmake text eol=lf
 *.yml   text eol=lf
-linux/appimage/AppRun text eol=lf
+linux/proton/appimage/AppRun text eol=lf

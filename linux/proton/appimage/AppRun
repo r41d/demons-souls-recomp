@@ -7,9 +7,9 @@
 #
 #   DemonsSoulsRecomp-Setup-x86_64.AppImage            set up what is missing, then play
 #   ... setup [image.iso | image.zip | folder] [--key HEX] [--rpcs3 path] [--jobs N]
-#   ... play [--ms-d3dcompiler]                          (linux/play.sh; DES_FPS etc. as in PLAY.bat)
+#   ... play [--ms-d3dcompiler]                          (linux/proton/play.sh; DES_FPS etc. as in PLAY.bat)
 #   ... build [--jobs N]                                 rebuild after changing code
-#   ... selftest [--cross-runtime]                       check the bundled tools (docs/LINUX.md)
+#   ... selftest [--cross-runtime]                       check the bundled tools (docs/LINUX_PROTON.md)
 #   ... shell                                            a shell with the kit's tools on PATH
 HERE=$(dirname "$(readlink -f "$0")")
 SELF=${APPIMAGE:-$(readlink -f "$0")}
@@ -48,7 +48,7 @@ done
 cmd=${1:-}
 [ $# -gt 0 ] && shift
 case "$cmd" in
-  selftest) exec "$DS_PYTHON" -I "$HERE/usr/share/demons-souls-recomp/linux/selftest.py" "$@" ;;
+  selftest) exec "$DS_PYTHON" -I "$HERE/usr/share/demons-souls-recomp/linux/proton/selftest.py" "$@" ;;
   shell)
     export PATH="$PYHOME/bin:$DS_LLVM_DIR:$(dirname "$XWIN"):$PATH"
     echo "Kit tools on PATH (python, clang-cl, lld-link, xwin). Type exit to leave."
@@ -62,16 +62,16 @@ DS_HOME=${DS_HOME:-$HOME/DemonsSoulsRecomp}
 mkdir -p "$DS_HOME" || { echo "Cannot create $DS_HOME (set DS_HOME to another folder)"; pause; exit 1; }
 # This kit's scripts and patches -> the data folder (your files there are left alone)
 cp -rf "$HERE/usr/share/demons-souls-recomp/." "$DS_HOME/" || { pause; exit 1; }
-chmod +x "$DS_HOME"/linux/*.sh 2>/dev/null
+chmod +x "$DS_HOME"/linux/*.sh "$DS_HOME"/linux/*/*.sh 2>/dev/null
 cd "$DS_HOME" || exit 1
 export DS_SETUP_NAME="the AppImage" DS_PLAY_HINT="Start the AppImage again (or with: play) to play."
 echo "Demon's Souls PC port kit -- data folder: $DS_HOME"
 echo "Works on Linux (tested on Ubuntu 24.04) and the Steam Deck (slow loads, not fully smooth yet)."
-echo "Please report how it goes on GitHub (docs/LINUX.md, \"For testers\")."
+echo "Please report how it goes on GitHub (docs/LINUX_PROTON.md, \"For testers\")."
 
 case "$cmd" in
   build) "$DS_PYTHON" setup/build.py "$@"; rc=$?; pause; exit $rc ;;
-  play) exec sh linux/play.sh "$@" ;;
+  play) exec sh linux/proton/play.sh "$@" ;;
 esac
 "$DS_PYTHON" setup/setup.py "$@"
 rc=$?
@@ -79,7 +79,7 @@ if [ $rc -ne 0 ] || [ "$cmd" = setup ]; then pause; exit $rc; fi
 printf '\nStart Demon\047s Souls now? [Y/n] '
 read -r a || a=n
 case "$a" in [nN]*) exit 0 ;; esac
-sh linux/play.sh
+sh linux/proton/play.sh
 rc=$?
 [ $rc -ne 0 ] && pause
 exit $rc

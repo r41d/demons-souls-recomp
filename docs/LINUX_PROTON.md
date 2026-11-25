@@ -1,4 +1,7 @@
-# Linux and Steam Deck
+# Linux and Steam Deck: the Windows build through Proton (`linux/proton/`)
+
+This is the alternative kit. The recommended one is the native Linux build (Vulkan, no Wine), in
+`linux/native/`: [LINUX_NATIVE.md](LINUX_NATIVE.md).
 
 > **Works on Linux and the Steam Deck.** On the Deck it plays but is not perfect yet: loads are slow and it is
 > not fully smooth. The kit has also set up and played the game on Ubuntu
@@ -21,7 +24,7 @@ Vulkan renderer and no Proton (faster on the Steam Deck): see [LINUX_NATIVE.md](
 - A Linux PC (x86-64) with a Vulkan GPU driver, or a Steam Deck (in desktop mode for the setup).
 - Your Demon's Souls disc image (USA **BLUS-30443** or Europe **BLES-00932**): `.iso`, Redump `.zip`, or a
   dumped disc folder, plus its disc key if it is encrypted (as Redump images are). The European game's
-  language follows `PS3_LANG` (`fr`, `de`, `es`, `it`; English otherwise), e.g. `PS3_LANG=fr linux/play.sh`.
+  language follows `PS3_LANG` (`fr`, `de`, `es`, `it`; English otherwise), e.g. `PS3_LANG=fr linux/proton/play.sh`.
 - About **25 GB free** (8 GB game files, 1-2 GB tools and SDK, the rest build files) and time: the first
   build takes 10-30 minutes on a desktop (6 minutes on a 16-core one), probably **1-2 hours on a
   Steam Deck**.
@@ -43,7 +46,7 @@ Vulkan renderer and no Proton (faster on the Steam Deck): see [LINUX_NATIVE.md](
    edits, build `DemonsSoulsRecomp.exe`. On the way it asks before each download.
 4. Then it offers to start the game. The first start sets up Proton (a few hundred MB download).
 5. To play later, run the AppImage again (it checks for updates to the patches and only rebuilds what
-   changed), or `~/DemonsSoulsRecomp/linux/play.sh`.
+   changed), or `~/DemonsSoulsRecomp/linux/proton/play.sh`.
 
 Settings are the same environment variables as on Windows: `DES_FPS=30|50|60|unlimited|31-240`
 (a Steam Deck defaults to 30), `DES_MOVIES=0` (skip movies), `DES_NAME=<name>`, `DES_RECORD=0`,
@@ -57,11 +60,11 @@ mouse work as on Windows (see `PLAY.bat` for the keys).
 ### From a git checkout instead of the AppImage
 
 You need Python 3.10+, git, and clang + lld 17 or newer (Debian/Ubuntu: `sudo apt install python3-venv
-git clang lld llvm`). Then `sh linux/setup.sh /path/to/image.iso` and `sh linux/play.sh`.
+git clang lld llvm`). Then `sh linux/proton/setup.sh /path/to/image.iso` and `sh linux/proton/play.sh`.
 
 ### Steam Deck game mode
 
-After the setup, add `~/DemonsSoulsRecomp/linux/play.sh` to Steam as a non-Steam game (Steam → Games →
+After the setup, add `~/DemonsSoulsRecomp/linux/proton/play.sh` to Steam as a non-Steam game (Steam → Games →
 Add a Non-Steam Game → Browse; set "Start in" to `~/DemonsSoulsRecomp`). Do not force a Proton version
 on that shortcut: `play.sh` starts Proton itself.
 
@@ -112,7 +115,7 @@ Open a GitHub issue with that. Known unknowns, roughly in the order they may bit
   self-test run on Ubuntu and in bare Debian and Arch Linux containers (no Python, git or compiler
   installed); started by hand with "cross_build_test", it also cross-compiles ps3recomp's whole
   runtime library, renderer included, on Linux.
-- `linux/play.sh` sets the same variables as `PLAY.bat` for every frame-rate mode (checked with a stand-in
+- `linux/proton/play.sh` sets the same variables as `PLAY.bat` for every frame-rate mode (checked with a stand-in
   for Wine).
 - On a real Linux PC: Ubuntu 24.04, Intel i7-4770K + NVIDIA GTX 980 under Proton. Setup and the game
   run; the tutorial plays at about 57-58 fps on average in 60 fps mode, with frequent one-frame hitches
@@ -122,7 +125,7 @@ Open a GitHub issue with that. Known unknowns, roughly in the order they may bit
 
 ## How it works (for developers)
 
-- `linux/appimage/build-appimage.sh` makes the AppImage: python-appimage's Python with cryptography,
+- `linux/proton/appimage/build-appimage.sh` makes the AppImage: python-appimage's Python with cryptography,
   CMake and Ninja; LLVM's release clang-cl/lld-link/llvm-lib/llvm-rc; xwin; a fallback git; this repo's
   `setup/`, `tools/`, `patches/`, `project/`, `linux/`, `docs/`. It refuses to package anything that
   looks like game data. `.github/workflows/linux-appimage.yml` builds and tests it.
@@ -132,12 +135,12 @@ Open a GitHub issue with that. Known unknowns, roughly in the order they may bit
   `usr/share/licenses/SOURCES.txt` inside the AppImage lists them. Python's GPL/LGPL modules (readline,
   gdbm, crypt, nis), which the kit never uses, are removed. Whoever re-hosts the AppImage has to offer
   that sources file alongside it.
-- `linux/appimage/AppRun` copies the kit's scripts into the data folder and runs `setup/setup.py` there,
-  then `linux/play.sh`. `selftest` checks the bundled tools (`linux/selftest.py`).
+- `linux/proton/appimage/AppRun` copies the kit's scripts into the data folder and runs `setup/setup.py` there,
+  then `linux/proton/play.sh`. `selftest` checks the bundled tools (`linux/proton/selftest.py`).
 - `setup/build.py` cross-compiles when not on Windows (or with `DS_XWIN=1` on Windows): toolchain file
   `setup/clang-cl-xwin.cmake`, the SDK from `xwin splat --use-winsysroot-style` in `deps/xwin`, found
   through the `INCLUDE` / `LIB` environment variables, the C runtime linked statically (`/MT`) so Wine
   needs no Visual C++ DLLs, and no manifest step. `setup/build.py --runtime-only` builds just
   ps3recomp's runtime library (no disc needed).
-- `linux/play.sh` sets the same variables as `PLAY.bat` (paths as `Z:\...` for the Windows program) and
+- `linux/proton/play.sh` sets the same variables as `PLAY.bat` (paths as `Z:\...` for the Windows program) and
   runs the exe through umu-launcher (`umu-run`), a Proton folder, or Wine.

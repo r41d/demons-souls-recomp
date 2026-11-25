@@ -1,5 +1,5 @@
-# The Linux / Steam Deck setup + play kit (docs/LINUX.md): a tools-only AppImage. It is built here from
-# this repo plus open-source tools, never from game data (linux/appimage/build-appimage.sh refuses any).
+# The Linux / Steam Deck setup + play kit (docs/LINUX_PROTON.md): a tools-only AppImage. It is built here from
+# this repo plus open-source tools, never from game data (linux/proton/appimage/build-appimage.sh refuses any).
 name: Linux AppImage (tools only)
 
 on:
@@ -25,7 +25,7 @@ permissions:
 jobs:
   patches:
     # patches/ps3recomp-local.patch onto a fresh ps3recomp checkout, and the update from older versions of it
-    # (patch_sync), with stock Linux git -- what linux/setup.sh does. No game files; git history for the
+    # (patch_sync), with stock Linux git -- what linux/proton/setup.sh does. No game files; git history for the
     # older versions.
     runs-on: ubuntu-22.04
     steps:
@@ -90,13 +90,13 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: build-appimage/cache
-          key: appimage-downloads-${{ hashFiles('linux/appimage/build-appimage.sh', 'setup/build.py') }}
+          key: appimage-downloads-${{ hashFiles('linux/proton/appimage/build-appimage.sh', 'setup/build.py') }}
           restore-keys: appimage-downloads-
       - name: Build the AppImage
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: >-
-          bash linux/appimage/build-appimage.sh "$PWD/DemonsSoulsRecomp-Setup-x86_64.AppImage"
+          bash linux/proton/appimage/build-appimage.sh "$PWD/DemonsSoulsRecomp-Setup-x86_64.AppImage"
           "$PWD/DemonsSoulsRecomp-Setup-sources.tar"
       - name: Self-test on the runner
         run: APPIMAGE_EXTRACT_AND_RUN=1 ./DemonsSoulsRecomp-Setup-x86_64.AppImage selftest

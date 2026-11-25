@@ -10,7 +10,7 @@ your copy of the game and is not in this repository: a portrait capsule (600x900
 
 add writes Steam's shortcuts.vdf for every Steam user on this computer: a "Demon's Souls" shortcut that runs
 linux/native/launcher.py --steam (the launcher, which a controller works, closing when the game ends), made once and updated after
-(found by its linux/native path). A shortcut for the Proton build (linux/play.sh) gets the same artwork.
+(found by its linux/native path). A shortcut for the Proton build (linux/proton/play.sh, or linux/play.sh from before) gets the same artwork.
 Steam rewrites shortcuts.vdf when it exits, so it has to be closed while this runs: --restart-steam closes
 it and starts it again (the installer and the launcher ask first).
 
@@ -204,9 +204,11 @@ def add_to_steam(log=print):
         entries = top[0][2]
         native = [e for t, k, e in entries if t == 0 and '/linux/native/' in field(e, 'Exe', '') +
                   field(e, 'LaunchOptions', '')]
-        proton = [e for t, k, e in entries if t == 0 and 'linux/play.sh' in field(e, 'Exe', '') +
-                  field(e, 'LaunchOptions', '') and 'demons-souls' in (field(e, 'Exe', '') +
-                                                                         field(e, 'LaunchOptions', '')).lower()]
+        # the Proton build's play script: linux/proton/play.sh, or linux/play.sh where it was before
+        proton = [e for t, k, e in entries if t == 0 and
+                  any(s in field(e, 'Exe', '') + field(e, 'LaunchOptions', '')
+                      for s in ('linux/proton/play.sh', 'linux/play.sh')) and
+                  'demons-souls' in (field(e, 'Exe', '') + field(e, 'LaunchOptions', '')).lower()]
         if native:
             e = native[0]
             set_field(e, 'Exe', 1, exe)

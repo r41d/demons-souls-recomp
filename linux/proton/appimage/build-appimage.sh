@@ -1,11 +1,11 @@
 #!/bin/bash
-# Builds DemonsSoulsRecomp-Setup-x86_64.AppImage, the Linux / Steam Deck setup + play kit (docs/LINUX.md).
+# Builds DemonsSoulsRecomp-Setup-x86_64.AppImage, the Linux / Steam Deck setup + play kit (docs/LINUX_PROTON.md).
 #
 # TOOLS ONLY. It holds a relocatable Python (python-appimage) with cryptography/CMake/Ninja, clang-cl +
 # lld-link + llvm-lib + llvm-rc from LLVM's own Linux release, xwin, a fallback git, and this repo's
 # setup/, tools/, patches/, project/, linux/ and docs/. Never game files, the EBOOT, recompiled code,
 # keys, firmware, saves, shader caches, RPCS3, Proton or Microsoft's CRT/SDK: the player's PC gets those
-# itself (docs/LINUX.md). check_payload below refuses to package anything that looks like them.
+# itself (docs/LINUX_PROTON.md). check_payload below refuses to package anything that looks like them.
 #
 # The git copy and the libraries it needs are GPL/LGPL: their Debian/Ubuntu source packages are
 # collected into DemonsSoulsRecomp-Setup-sources.tar, which must be published in the same place as the
@@ -15,10 +15,10 @@
 # Needs curl, tar, zstd, patchelf, git, python3, and deb-src entries for apt-get source (the workflow
 # adds them). SKIP_SOURCES=1 skips the sources: for a local test build only, never to hand out.
 # Downloads are cached in $CACHE.
-#   linux/appimage/build-appimage.sh [output.AppImage [sources.tar]]
+#   linux/proton/appimage/build-appimage.sh [output.AppImage [sources.tar]]
 set -euo pipefail
 
-REPO=$(cd "$(dirname "$0")/../.." && pwd)
+REPO=$(cd "$(dirname "$0")/../../.." && pwd)
 OUT=${1:-$REPO/DemonsSoulsRecomp-Setup-x86_64.AppImage}
 SRC_OUT=${2:-$(dirname "$OUT")/DemonsSoulsRecomp-Setup-sources.tar}
 WORK=${WORK:-$REPO/build-appimage}
@@ -157,7 +157,7 @@ sort -u "$ORIGINS" | while read -r f; do pkg=$(owner "$f") || exit 1; echo "$pkg
   echo "Ubuntu 22.04: git (GPL-2.0) and the libraries it needs (several LGPL; all are"
   echo "included here, whatever their license)."
   echo "The source packages are in DemonsSoulsRecomp-Setup-sources.tar, published next to the AppImage."
-  echo "The only change made to these binaries: their RPATH (patchelf, linux/appimage/build-appimage.sh)."
+  echo "The only change made to these binaries: their RPATH (patchelf, linux/proton/appimage/build-appimage.sh)."
   echo
   printf '%-34s %-40s %s\n' "binary package" "source package=version" "bundled file"
 } > "$SRC/SOURCES.txt"
@@ -194,7 +194,7 @@ mkdir -p "$SHARE"
   done
 find "$SHARE" -name '__pycache__' -prune -exec rm -rf {} +
 rm -f "$SHARE/setup/local_config.json"
-chmod +x "$SHARE"/linux/*.sh
+chmod +x "$SHARE"/linux/*.sh "$SHARE"/linux/*/*.sh
 cp "$REPO/LICENSE" "$APPDIR/usr/share/licenses/demons-souls-recomp-LICENSE"
 cat > "$APPDIR/usr/share/licenses/README.txt" <<EOF
 Demon's Souls PC port -- Linux setup + play kit. Tools only: no game data, no recompiled code.
@@ -217,7 +217,7 @@ umu-launcher / Proton (their licenses).
 EOF
 
 say "launcher, desktop entry, icon"
-cp "$REPO/linux/appimage/AppRun" "$APPDIR/AppRun"
+cp "$REPO/linux/proton/appimage/AppRun" "$APPDIR/AppRun"
 chmod +x "$APPDIR/AppRun"
 cat > "$APPDIR/demons-souls-recomp.desktop" <<'EOF'
 [Desktop Entry]

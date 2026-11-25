@@ -1,5 +1,5 @@
 # CMake toolchain: build the Windows exe with clang-cl + lld-link and a Microsoft CRT/SDK that xwin
-# fetched on this PC (deps/xwin), without Visual Studio. This is how Linux builds it (docs/LINUX.md);
+# fetched on this PC (deps/xwin), without Visual Studio. This is how Linux builds it (docs/LINUX_PROTON.md);
 # on Windows "set DS_XWIN=1" before BUILD.bat tests the same path. setup/build.py passes DS_LLVM_BIN
 # and puts the SDK's include and library folders in the INCLUDE and LIB environment variables, which
 # clang-cl and lld-link read the way cl.exe and link.exe do (no paths in the flags, so a data folder

@@ -1,7 +1,7 @@
 #!/bin/bash
 # Launches Demon's Souls (BLUS-30443, ps3recomp static recompilation) natively on Linux: the x86-64 build in
 # port/build_linux (linux/native/build.sh), drawn by ps3recomp's Vulkan backend. No Wine, no Proton, no
-# D3D12. Same game settings as linux/play.sh / PLAY.bat otherwise. On SteamOS the build lives in a distrobox
+# D3D12. Same game settings as linux/proton/play.sh / PLAY.bat otherwise. On SteamOS the build lives in a distrobox
 # container (port/build_linux/.distrobox names it) and the game runs inside it.
 #
 # Input: a controller (DualSense, DualShock 4, Xbox, the Steam Deck's own) through SDL; keyboard + mouse
@@ -27,7 +27,7 @@
 #   DES_MANA_REGEN=1     the player gets MP back over time (DES_MANA_REGEN_RATE=<1..600> MP a minute, default 180 = 3 a second)
 #   DES_LOG=1            the runtime's per-event log lines (PS3_VERBOSE=1); off by default, they cost frames
 #   DES_GPU_CLOCK=<MHz>|auto   Steam Deck only: pin the GPU clock for the session (default 800; see
-#                        linux/play.sh, the same helper and the same reason)
+#                        linux/proton/play.sh, the same helper and the same reason)
 #   DES_EXE=<path>       run another build of DemonsSoulsRecomp (A/B tests)
 #   DES_LOG_DIR=<dir>    where last_run_out.txt / last_run_err.txt go (default logs/)
 set -u
@@ -85,7 +85,7 @@ export DES_DISPQ_BATCH="${DES_DISPQ_BATCH:-1}" SPU_DISPQ_WAIT="${SPU_DISPQ_WAIT:
 export AUDIO_RATE="${AUDIO_RATE:-1}" DES_STEP_STATS="${DES_STEP_STATS:-1}" EVT_BACKLOG="${EVT_BACKLOG:-1}"
 export HITCH_MS="${HITCH_MS:-100}"
 if [ -n "$DECK" ]; then
-  # 4 cores share 15 W with the GPU: idle SPUs back off and then sleep (linux/play.sh has the measurements).
+  # 4 cores share 15 W with the GPU: idle SPUs back off and then sleep (linux/proton/play.sh has the measurements).
   export SPU_IDLE_PAUSE="${SPU_IDLE_PAUSE:-128}" SPU_IDLE_SLEEP_US="${SPU_IDLE_SLEEP_US:-50}"
 fi
 [ "${DES_GOD:-}" = 1 ] && export DES_GOD=1
@@ -103,7 +103,7 @@ case "${DES_FPS:-60}" in
 esac
 if [ "${DES_LOG:-0}" = 1 ]; then export PS3_VERBOSE=1; else export PS3_VERBOSE="${PS3_VERBOSE:-0}"; fi
 
-# Steam Deck: pin the GPU clock for this session (linux/play.sh explains why), back to automatic on exit.
+# Steam Deck: pin the GPU clock for this session (linux/proton/play.sh explains why), back to automatic on exit.
 GPU_DEV=/sys/class/drm/card0/device GPU_PRIV=/usr/bin/steamos-polkit-helpers/steamos-priv-write
 gpu_clock_restore() { "$GPU_PRIV" "$GPU_DEV/power_dpm_force_performance_level" auto >/dev/null 2>&1; }
 if [ -n "$DECK" ] && [ "${DES_GPU_CLOCK:-800}" != auto ] && [ -x "$GPU_PRIV" ] &&

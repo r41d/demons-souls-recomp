@@ -12,7 +12,7 @@ The lifted SPU code uses AVX2 when this CPU has it (DS_AVX2). On an older CPU it
 and port/build_opt/no_avx2.txt tells PLAY.bat not to ask for it. "set DS_AVX2=0" before BUILD.bat
 builds without AVX2 on any CPU (for a copy meant for an older PC).
 
-On Linux (docs/LINUX.md) the same exe is cross-compiled: clang-cl + lld-link from LLVM, with the
+On Linux (docs/LINUX_PROTON.md) the same exe is cross-compiled: clang-cl + lld-link from LLVM, with the
 Microsoft C runtime and Windows SDK fetched on this PC by xwin (Microsoft's license is shown and
 accepted by you, nothing of it is shipped with this repo) and the C runtime linked statically so
 Wine/Proton needs no Visual C++ DLLs (setup/clang-cl-xwin.cmake). "set DS_XWIN=1" before BUILD.bat

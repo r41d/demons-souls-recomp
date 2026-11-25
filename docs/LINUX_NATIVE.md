@@ -1,7 +1,7 @@
 # Native Linux build (Vulkan, no Proton) — experimental
 
 The game built as a Linux program and drawn by ps3recomp's Vulkan backend, instead of the Windows build
-through Proton (`linux/play.sh`, [LINUX.md](LINUX.md)). It skips Wine and the D3D12 → Vulkan translation,
+through Proton (`linux/proton/play.sh`, [LINUX_PROTON.md](LINUX_PROTON.md)). It skips Wine and the D3D12 → Vulkan translation,
 and the Steam Deck gets more from its CPU.
 
 **Status:** tested on the Steam Deck only (RADV, SteamOS 3, built in an Arch distrobox). Other GPUs and
@@ -96,7 +96,7 @@ DES_ISO=/path/to/image.iso DES_KEY=<32 hex digits or .dkey> linux/native/build.s
 The steps are `deps venv game decrypt toolkit lift build` (`linux/native/build.sh build` runs only the
 compile). The game files come from your own disc image, the EBOOT is decrypted without RPCS3 (the keys are
 downloaded once from RPCS3's source), and the build lands in `port/build_linux/DemonsSoulsRecomp`. A
-checkout that already went through `linux/setup.sh` (the Proton build) has the game files and the lifted
+checkout that already went through `linux/proton/setup.sh` (the Proton build) has the game files and the lifted
 code; only `build` is new then. The first build takes about an hour on a Steam Deck, less on a desktop.
 
 Options: `DES_LTO=1` (ThinLTO across the whole program: about 3.5% faster on the Deck, a longer link),
@@ -141,7 +141,7 @@ library. A controller works the launcher, for game mode: up / down (D-pad or lef
 items, left / right changes the selected one, A presses it, B backs out of a menu or a question, Start plays;
 A on the character name opens Steam's on-screen keyboard. The arrow keys and Enter do the same. It comes with library artwork cut from your own disc's background picture (`PS3_GAME/PIC1.PNG`):
 a portrait and a wide capsule, the hero banner, the logo and an icon, kept in `port/steam_art/`. A shortcut
-for the Proton build (`linux/play.sh`) gets the same artwork. Steam rewrites its shortcut list when it exits,
+for the Proton build (`linux/proton/play.sh`) gets the same artwork. Steam rewrites its shortcut list when it exits,
 so it closes for a moment and opens again. The first change keeps a copy of the old list
 (`shortcuts.vdf.before-demons-souls`).
 

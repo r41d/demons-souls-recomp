@@ -2,7 +2,7 @@
 # Launches Demon's Souls (BLUS-30443, ps3recomp static recompilation) natively on macOS (Apple silicon):
 # the arm64 build in port/build_mac, drawn by ps3recomp's Metal backend. No Wine, no D3D12: the port's
 # Direct3D 12 renderer (rsx_live_draw.c) is Windows-only, so the Mac build draws through the toolkit's own
-# Metal RSX backend. Same game settings as linux/play.sh / PLAY.bat otherwise.
+# Metal RSX backend. Same game settings as linux/native/play.sh / PLAY.bat otherwise.
 #
 # The game runs under the window launcher (DemonsSoulsRecomp_window): it owns the window on the main
 # thread and the game renders into IOSurfaces it shares (ps3recomp tools/host_window).
@@ -58,7 +58,7 @@ case "$SIZE" in
 esac
 
 DES_GAME=${DES_GAME:-game}
-# DES_BOSS_RUSH=1: boss rush mode, as in PLAY.bat / linux/play.sh -- game_bossrush, made from game/ by
+# DES_BOSS_RUSH=1: boss rush mode, as in PLAY.bat / linux/native/play.sh -- game_bossrush, made from game/ by
 # tools/make_boss_rush.py (hard links: no extra disk space), its own saves in bossrush/gamedata (your normal
 # saves are never used) and the run timer's files in bossrush/. DES_BR_SOULS=<n> multiplies the souls.
 # DES_BOSS_RUSH_DIR moves bossrush/ (a test run).
@@ -81,7 +81,7 @@ LOGS=${DES_LOG_DIR:-$D/logs}
 # (a test run moves these, and PS3_GAMEDATA_ROOT for the saves, into its own folder)
 export PS3_HDD0_ROOT="${PS3_HDD0_ROOT:-$D/hdd0}" PS3_HDD1_ROOT="${PS3_HDD1_ROOT:-$D/hdd1}" PS3_DEV_FLASH="${PS3_DEV_FLASH:-$D/no_flash}"
 # The game copies files it has read from the disc into its HDD1 cache and trusts them on the next run. That
-# cache goes before every run, as in PLAY.bat / linux/play.sh: a killed run leaves truncated files there, and
+# cache goes before every run, as in PLAY.bat / linux/native/play.sh: a killed run leaves truncated files there, and
 # a copy from another version of the game's files (boss rush, the Remaster mod, an update that changed shops
 # or texts) would be used instead of the files themselves.
 rm -rf "${PS3_HDD1_ROOT:?}/cache"

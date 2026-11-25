@@ -95,7 +95,8 @@ jobs:
               rel = [n[len(top):] for n in names]
               must = {'Windows': ['SETUP.bat', 'BUILD.bat', 'PLAY.bat', 'DemonsSoulsLauncher.exe', 'setup/update.py'],
                       'macOS':   ['mac/install.sh', 'mac/play.sh', 'setup/setup.py'],
-                      'Linux':   ['linux/native/install.sh', 'linux/native/play.sh', 'linux/play.sh', 'linux/setup.sh',
+                      'Linux':   ['linux/native/install.sh', 'linux/native/play.sh', 'linux/proton/play.sh', 'linux/proton/setup.sh',
+                                  'linux/play.sh', 'linux/setup.sh',
                                   'mac/setup_steps.py', 'setup/setup.py']}[plat]
               missing = [m for m in must + ['patches/ps3recomp-local.patch', 'patches/lifted-code.patch', 'VERSION']
                          if m not in rel]

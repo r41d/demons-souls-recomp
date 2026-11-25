@@ -103,13 +103,13 @@ Vulkan GPU driver, about **25 GB** free, and an internet connection for the firs
    elsewhere, e.g. on an SD card). It asks before each download, including Microsoft's SDK license. The
    first build takes 10–30 minutes on a desktop and 1–2 hours on a Steam Deck.
 3. It offers to start the game; the first start sets up Proton (a few hundred MB). To play later, run the
-   AppImage again (it updates and rebuilds what changed) or `~/DemonsSoulsRecomp/linux/play.sh`.
+   AppImage again (it updates and rebuilds what changed) or `~/DemonsSoulsRecomp/linux/proton/play.sh`.
 
 Settings are the same switches as on Windows, e.g. `DES_FPS=60 ./DemonsSoulsRecomp-Setup-x86_64.AppImage play`
-(a Steam Deck defaults to 30 fps). **Steam Deck game mode:** add `~/DemonsSoulsRecomp/linux/play.sh` as a
+(a Steam Deck defaults to 30 fps). **Steam Deck game mode:** add `~/DemonsSoulsRecomp/linux/proton/play.sh` as a
 non-Steam game, with *Start in* set to `~/DemonsSoulsRecomp` and no forced Proton version. **From a git
 checkout** instead: install Python 3.10+, git, and clang + lld 17 or newer, then run
-`sh linux/setup.sh /path/to/image.iso` and `sh linux/play.sh`. Troubleshooting: [docs/LINUX.md](docs/LINUX.md).
+`sh linux/proton/setup.sh /path/to/image.iso` and `sh linux/proton/play.sh`. Troubleshooting: [docs/LINUX_PROTON.md](docs/LINUX_PROTON.md).
 
 ### macOS (Apple silicon)
 
@@ -155,7 +155,7 @@ on-screen keyboard (the character is named "Slayer"), and rumble. Details, measu
 SETUP builds the European release too, from your own European disc image: it reads which disc it is and uses
 `patches/lifted-code-eu.patch`, the port's edits carried over to the European EBOOT. The European game picks its
 language from the system language: pick it under **Language** in the launcher (Windows and native Linux), or set
-**`PS3_LANG=fr`** (or `de`, `es`, `it`; anything else gives English) before `PLAY.bat` / `linux/play.sh`. Notes:
+**`PS3_LANG=fr`** (or `de`, `es`, `it`; anything else gives English) before `PLAY.bat` / `linux/proton/play.sh`. Notes:
 - Use a separate folder for each release. Switching one folder from one disc to the other is not supported.
 - European saves are separate from US ones (the save folders are named after the disc, BLES00932...).
 - Tested on Linux through Proton: setup, a new character into the tutorial at 30 and 60 fps, and the French text.
@@ -253,7 +253,7 @@ Saves go to `gamedata/`, and logs to `logs/`; they grow ~600 MB an hour, and the
 
 ### Boss rush mode
 
-*Game: Boss rush* in the launcher (or `DES_BOSS_RUSH=1 linux/play.sh`, or `DES_BOSS_RUSH=1 linux/native/play.sh` for
+*Game: Boss rush* in the launcher (or `DES_BOSS_RUSH=1 linux/proton/play.sh`, or `DES_BOSS_RUSH=1 linux/native/play.sh` for
 the native Linux build, `DES_BOSS_RUSH=1 mac/play.sh` on a Mac). Make a new character:
 you skip the tutorial and start in the Nexus in soul form, with 7,000 souls and every trader there. Boldwin also
 sells every weapon and shield, every armour piece and ring, every upgrade material, Turpentine and Firebombs,
@@ -333,7 +333,9 @@ patches/                     ps3recomp-local.patch (runtime, on ps3recomp @ 4e8f
 tools/                       disc extraction, SPU lifting, perf report, mod installer, model tool
 translations/arabic/         Arabic translation: our text, fonts (OFL) and the installer that builds it from your game
 docs/NOTES.md                development log: every fix, why, and how it was measured
-linux/, mac/                 Linux / Steam Deck kit and macOS build (docs/LINUX.md, docs/MACOS.md)
+linux/native/                native Linux / Steam Deck build: installer, launcher, build + play (docs/LINUX_NATIVE.md)
+linux/proton/                the Windows build through Proton: setup, play, AppImage (docs/LINUX_PROTON.md)
+mac/                         macOS build (docs/MACOS.md)
 android/                     Android (arm64) build: APK project, entry point, build scripts (docs/ANDROID.md)
 ```
 

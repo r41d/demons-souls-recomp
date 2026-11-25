@@ -15,7 +15,7 @@ update of this repo, steps 3 and 5 re-apply the patches that changed (setup/patc
 usage: SETUP.bat [image.iso | image.zip | dumped disc folder] [--key HEX | --key file.dkey]
                  [--rpcs3 path\\to\\rpcs3.exe] [--jobs N]
 
-On Linux the same steps run from linux/setup.sh or the AppImage (docs/LINUX.md); step 2's fallback
+On Linux the same steps run from linux/proton/setup.sh or the AppImage (docs/LINUX_PROTON.md); step 2's fallback
 is RPCS3's Linux AppImage and step 6 cross-compiles the Windows exe (setup/build.py).
 """
 import glob, hashlib, json, os, shutil, subprocess, sys, urllib.parse, urllib.request
@@ -35,7 +35,7 @@ CONFIG = os.path.join(ROOT, 'setup', 'local_config.json')       # remembered pat
 
 PS3RECOMP_URL = 'https://github.com/sp00nznet/ps3recomp.git'
 PS3RECOMP_COMMIT = '4e8f3ca87a3e1d87bb83b8b7e9348fe2685cd514'   # v0.18.0, what the patches are made against
-# What to tell you to run: the Linux launchers (linux/setup.sh, the AppImage) set these
+# What to tell you to run: the Linux launchers (linux/proton/setup.sh, the AppImage) set these
 SETUP_NAME = os.environ.get('DS_SETUP_NAME') or 'SETUP.bat'
 PLAY_HINT = os.environ.get('DS_PLAY_HINT') or 'Double-click DemonsSoulsLauncher.exe to play.'
 RPCS3_LINUX_RELEASES = 'https://api.github.com/repos/RPCS3/rpcs3-binaries-linux/releases/latest'
